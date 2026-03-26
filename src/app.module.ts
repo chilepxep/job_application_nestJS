@@ -11,6 +11,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { WinstonModule } from 'nest-winston';
 import { loggerConfig } from './config/logger.config';
+import { PermissionsModule } from './permissions/permissions.module';
 
 @Module({
   imports: [
@@ -51,6 +52,8 @@ import { loggerConfig } from './config/logger.config';
 
     //logger
     WinstonModule.forRoot(loggerConfig),
+
+    PermissionsModule,
   ],
   controllers: [AppController],
   providers: [
