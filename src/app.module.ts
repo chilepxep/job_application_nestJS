@@ -13,6 +13,7 @@ import { WinstonModule } from 'nest-winston';
 import { loggerConfig } from './config/logger.config';
 import { PermissionsModule } from './permissions/permissions.module';
 import { RolesModule } from './roles/roles.module';
+import { CompaniesModule } from './companies/companies.module';
 
 @Module({
   imports: [
@@ -57,6 +58,8 @@ import { RolesModule } from './roles/roles.module';
     PermissionsModule,
 
     RolesModule,
+
+    CompaniesModule,
   ],
   controllers: [AppController],
   providers: [
