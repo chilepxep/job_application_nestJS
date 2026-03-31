@@ -101,7 +101,10 @@ export class PermissionsService {
         .limit(limit)
         .sort({ createdAt: sort === SortOrder.ASC ? 1 : -1 })
         .select('-__v'),
-      this.permissionModel.countDocuments(filter),
+      this.permissionModel.countDocuments({
+        ...filter,
+        isDeleted: { $ne: true },
+      }),
     ]);
 
     return {

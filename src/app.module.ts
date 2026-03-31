@@ -12,6 +12,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { WinstonModule } from 'nest-winston';
 import { loggerConfig } from './config/logger.config';
 import { PermissionsModule } from './permissions/permissions.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -54,6 +55,8 @@ import { PermissionsModule } from './permissions/permissions.module';
     WinstonModule.forRoot(loggerConfig),
 
     PermissionsModule,
+
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [
