@@ -14,6 +14,7 @@ import { loggerConfig } from './config/logger.config';
 import { PermissionsModule } from './permissions/permissions.module';
 import { RolesModule } from './roles/roles.module';
 import { CompaniesModule } from './companies/companies.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -60,6 +61,8 @@ import { CompaniesModule } from './companies/companies.module';
     RolesModule,
 
     CompaniesModule,
+
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [
