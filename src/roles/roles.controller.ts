@@ -25,12 +25,6 @@ import { CurrentUser } from '../decorator/current-user.decorator';
 import { ResponseMessage } from '../decorator/customize';
 import { IUser } from '../common/interfaces/user.interface';
 
-const mockUser: IUser = {
-  _id: new Types.ObjectId('69c4eb29eca9f1a140f46149'),
-  email: 'admin@test.com',
-  role: { _id: new Types.ObjectId(), name: 'ADMIN' },
-};
-
 @ApiTags('Roles')
 @ApiBearerAuth('access-token')
 @Controller('roles')
@@ -41,7 +35,7 @@ export class RolesController {
   @ResponseMessage('Tạo role thành công')
   @ApiOperation({ summary: 'Tạo role mới' })
   create(@Body() createRoleDto: CreateRoleDto, @CurrentUser() user: IUser) {
-    return this.rolesService.create(createRoleDto, mockUser);
+    return this.rolesService.create(createRoleDto, user);
   }
 
   @Get()
@@ -66,14 +60,14 @@ export class RolesController {
     @Body() dto: UpdateRoleDto,
     @CurrentUser() user: IUser,
   ) {
-    return this.rolesService.update(id, dto, mockUser);
+    return this.rolesService.update(id, dto, user);
   }
 
   @Delete(':id')
   @ResponseMessage('Xoá role thành công')
   @ApiOperation({ summary: 'Xoá role' })
   remove(@Param('id') id: string, @CurrentUser() user: IUser) {
-    return this.rolesService.remove(id, mockUser);
+    return this.rolesService.remove(id, user);
   }
 
   //thêm per vào mảng permissions của role
@@ -86,7 +80,7 @@ export class RolesController {
     @Body() dto: UpdatePermissionsArryDto,
     @CurrentUser() user: IUser,
   ) {
-    return this.rolesService.addPermissions(id, dto.permissions, mockUser);
+    return this.rolesService.addPermissions(id, dto.permissions, user);
   }
 
   //xoá permissions khỏi mảng permissions của role
@@ -99,6 +93,6 @@ export class RolesController {
     @Body() dto: UpdatePermissionsArryDto,
     @CurrentUser() user: IUser,
   ) {
-    return this.rolesService.removePermissions(id, dto.permissions, mockUser);
+    return this.rolesService.removePermissions(id, dto.permissions, user);
   }
 }

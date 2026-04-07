@@ -20,12 +20,6 @@ import { IUser } from '../common/interfaces/user.interface';
 import { ResponseMessage } from '../decorator/customize';
 import { CurrentUser } from '../decorator/current-user.decorator';
 
-const mockUser: IUser = {
-  _id: new Types.ObjectId('69c4eb29eca9f1a140f46149'),
-  email: 'admin@test.com',
-  role: { _id: new Types.ObjectId(), name: 'ADMIN' },
-};
-
 @Controller('permissions')
 @ApiTags('Permissions')
 @ApiBearerAuth('access-token')
@@ -37,7 +31,7 @@ export class PermissionsController {
   @ApiOperation({ summary: 'Tạo permission mới' })
   @ResponseMessage('tạo mới permission thành công')
   create(@Body() dto: CreatePermissionDto, @CurrentUser() user: IUser) {
-    return this.permissionsService.create(dto, mockUser);
+    return this.permissionsService.create(dto, user);
   }
 
   @Get()
@@ -62,13 +56,13 @@ export class PermissionsController {
     @Body() dto: UpdatePermissionDto,
     @CurrentUser() user: IUser,
   ) {
-    return this.permissionsService.update(id, dto, mockUser);
+    return this.permissionsService.update(id, dto, user);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Xoá permission' })
   @ResponseMessage('xoá permission thành công')
   remove(@Param('id') id: string, @CurrentUser() user: IUser) {
-    return this.permissionsService.remove(id, mockUser);
+    return this.permissionsService.remove(id, user);
   }
 }

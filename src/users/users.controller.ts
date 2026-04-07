@@ -25,15 +25,6 @@ import { IUser } from '../common/interfaces/user.interface';
 import { ResponseMessage } from '../decorator/customize';
 import { CurrentUser } from '../decorator/current-user.decorator';
 
-const mockUser: IUser = {
-  _id: new Types.ObjectId('69cdeb47e80f62ad8b4c36f7'),
-  email: 'admin@gmail.com',
-  role: {
-    _id: new Types.ObjectId('69cb2fdda2530adba1728c3c'),
-    name: 'ADMIN',
-  },
-};
-
 @ApiTags('Users')
 @ApiBearerAuth('access-token')
 @Controller('users')
@@ -45,7 +36,7 @@ export class UsersController {
   @ResponseMessage('Tạo user thành công')
   @ApiOperation({ summary: 'Tạo user mới [Admin]' })
   create(@Body() createUserDto: CreateUserDto, @CurrentUser() user: IUser) {
-    return this.usersService.create(createUserDto, mockUser);
+    return this.usersService.create(createUserDto, user);
   }
 
   //xem toàn bộ user
@@ -61,7 +52,7 @@ export class UsersController {
   @ResponseMessage('Lấy thông tin cá nhân thành công')
   @ApiOperation({ summary: 'Lấy profile bản thân' })
   findMe(@CurrentUser() user: IUser) {
-    return this.usersService.findMe(mockUser._id.toString());
+    return this.usersService.findMe(user._id.toString());
   }
 
   //admin xem chi tiết bất kì user
@@ -78,7 +69,7 @@ export class UsersController {
   @ResponseMessage('Cập nhật thông tin cá nhân thành công')
   @ApiOperation({ summary: 'Cập nhật profile bản thân [All roles]' })
   updateMe(@Body() dto: UpdateMeDto, @CurrentUser() user: IUser) {
-    return this.usersService.updateMe(mockUser._id.toString(), dto, mockUser);
+    return this.usersService.updateMe(user._id.toString(), dto, user);
   }
 
   //admin khoá mở tài khoản
@@ -87,7 +78,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Khoá/mở tài khoản [Admin]' })
   @ApiParam({ name: 'id', description: 'User ID' })
   toggleActive(@Param('id') id: string, @CurrentUser() user: IUser) {
-    return this.usersService.toggleActive(id, mockUser);
+    return this.usersService.toggleActive(id, user);
   }
 
   //admin update bất kì
@@ -100,7 +91,7 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
     @CurrentUser() user: IUser,
   ) {
-    return this.usersService.update(id, dto, mockUser);
+    return this.usersService.update(id, dto, user);
   }
 
   //admin xoá user
@@ -109,6 +100,6 @@ export class UsersController {
   @ApiOperation({ summary: 'Xoá user [Admin]' })
   @ApiParam({ name: 'id', description: 'User ID' })
   remove(@Param('id') id: string, @CurrentUser() user: IUser) {
-    return this.usersService.remove(id, mockUser);
+    return this.usersService.remove(id, user);
   }
 }

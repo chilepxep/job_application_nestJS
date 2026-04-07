@@ -21,14 +21,8 @@ import {
 import { QueryCompanyDto } from './dto/query-company.dto';
 import { Types } from 'mongoose';
 import { IUser } from '../common/interfaces/user.interface';
-import { ResponseMessage } from '../decorator/customize';
+import { Public, ResponseMessage } from '../decorator/customize';
 import { CurrentUser } from '../decorator/current-user.decorator';
-
-const mockUser: IUser = {
-  _id: new Types.ObjectId('69c4eb29eca9f1a140f46149'),
-  email: 'admin@test.com',
-  role: { _id: new Types.ObjectId(), name: 'ADMIN' },
-};
 
 @ApiTags('Companies')
 @ApiBearerAuth('access-token')
@@ -41,11 +35,11 @@ export class CompaniesController {
   @ResponseMessage('Tạo công ty thành công')
   @ApiOperation({ summary: 'Tạo công ty mới [HR/Admin]' })
   create(@Body() dto: CreateCompanyDto, @CurrentUser() user: IUser) {
-    return this.companiesService.create(dto, mockUser);
+    return this.companiesService.create(dto, user);
   }
 
   @Get()
-  //@Public()
+  @Public()
   @ResponseMessage('Lấy danh sách công ty thành công')
   @ApiOperation({ summary: 'Lấy danh sách công ty [Public]' })
   findAllPublic(@Query() query: QueryCompanyDto) {
@@ -65,12 +59,12 @@ export class CompaniesController {
   @ApiOperation({ summary: 'Duyệt công ty [Admin]' })
   @ApiParam({ name: 'id', description: 'Company ID' })
   approve(@Param('id') id: string, @CurrentUser() user: IUser) {
-    return this.companiesService.approve(id, mockUser);
+    return this.companiesService.approve(id, user);
   }
 
   //xem chi tiết công ty
   @Get(':id')
-  // @Public()
+  @Public()
   @ResponseMessage('Lấy chi tiết công ty thành công')
   @ApiOperation({ summary: 'Lấy chi tiết công ty [Public]' })
   @ApiParam({ name: 'id', description: 'Company ID' })
@@ -89,7 +83,7 @@ export class CompaniesController {
     @Body() dto: UpdateCompanyDto,
     @CurrentUser() user: IUser,
   ) {
-    return this.companiesService.update(id, dto, mockUser);
+    return this.companiesService.update(id, dto, user);
   }
 
   @Delete(':id')
@@ -97,6 +91,6 @@ export class CompaniesController {
   @ApiOperation({ summary: 'Xoá công ty [HR/Admin]' })
   @ApiParam({ name: 'id', description: 'Company ID' })
   remove(@Param('id') id: string, @CurrentUser() user: IUser) {
-    return this.companiesService.remove(id, mockUser);
+    return this.companiesService.remove(id, user);
   }
 }
