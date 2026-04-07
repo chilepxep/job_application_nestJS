@@ -10,18 +10,21 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from './schemas/user.schemas';
 import mongoose, { Model } from 'mongoose';
-import { RolesService } from 'src/roles/roles.service';
-import { CompaniesService } from 'src/companies/companies.service';
+
 import bcrypt from 'bcrypt';
-import { IUser } from 'src/common/interfaces/user.interface';
+
 import { QueryUserDto } from './dto/query-user.dto';
-import { SortOrder } from 'src/permissions/dto/query-permission.dto';
+
 import {
   UpdateCandidateProfileDto,
   UpdateHrProfileDto,
   UpdateMeDto,
 } from './dto/update-me.dto';
-import { ProfileStrategyRegistry } from 'src/common/strategies/profile/profile-strategy.registry';
+import { RolesService } from '../roles/roles.service';
+import { CompaniesService } from '../companies/companies.service';
+import { ProfileStrategyRegistry } from '../common/strategies/profile/profile-strategy.registry';
+import { IUser } from '../common/interfaces/user.interface';
+import { SortOrder } from '../permissions/dto/query-permission.dto';
 
 @Injectable()
 export class UsersService {
@@ -439,6 +442,74 @@ export class UsersService {
     const hashed = refreshToken ? await bcrypt.hash(refreshToken, 10) : null;
 
     await this.userModel.updateOne({ _id: userId }, { refreshToken: hashed });
+  }
+
+  async findOneWithRefreshToken(userId: string) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('ID không hợp lệ');
+    }
+
+    const user = await this.userModel
+      .findById(userId)
+      .select('+refreshToken')
+      .populate({
+        path: 'role',
+        select: 'name permissions',
+        populate: {
+          path: 'permissions',
+          select: 'apiPath method',
+        },
+      })
+      .exec();
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy user');
+    }
+
+    return user;
+  }
+
+  async createFromAuth(data: {
+    email: string;
+    password: string; // đã hash
+    role: string;
+    profile: Partial<{
+      fullName: string;
+      phone: string;
+      gender: string;
+    }>;
+    isActive?: boolean;
+  }) {
+    const { email, password, role, profile, isActive } = data;
+
+    this.validateObjectId(role, 'Role ID');
+    const roleDoc = await this.rolesService.findOne(role);
+
+    // Lấy strategy theo role → khởi tạo đúng profile
+    const strategy = this.profileStrategyRegistry.getStrategy(roleDoc.name);
+    const profileData = strategy.initProfile();
+
+    return this.userModel.create({
+      email,
+      password,
+      role: roleDoc._id,
+      profile: profile ?? {},
+      ...profileData,
+      isActive: isActive ?? true,
+    });
+  }
+
+  // HR update company sau khi đăng ký
+  async updateHrCompany(userId: string, companyId: string, position?: string) {
+    await this.userModel.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          'hrProfile.company': new mongoose.Types.ObjectId(companyId),
+          ...(position && { 'hrProfile.position': position }),
+        },
+      },
+    );
   }
 
   // PATCH /api/v1/users/:id/reset-password

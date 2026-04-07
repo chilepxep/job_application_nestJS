@@ -9,8 +9,9 @@ import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Permission, PermissionDocument } from './schemas/permission.schema';
 import mongoose, { Model, Types } from 'mongoose';
-import { IUser } from 'src/common/interfaces/user.interface';
+
 import { QueryPermissionDto, SortOrder } from './dto/query-permission.dto';
+import { IUser } from '../common/interfaces/user.interface';
 
 @Injectable()
 export class PermissionsService {

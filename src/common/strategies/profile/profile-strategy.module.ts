@@ -3,7 +3,7 @@ import { CandidateStrategy } from './candidate.strategy';
 import { HrStrategy } from './hr.strategy';
 import { AdminStrategy } from './admin.strategy';
 import { ProfileStrategyRegistry } from './profile-strategy.registry';
-import { CompaniesModule } from 'src/companies/companies.module';
+import { CompaniesModule } from '../../../companies/companies.module';
 
 @Module({
   imports: [CompaniesModule],

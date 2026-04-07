@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsInt, IsOptional, Min } from 'class-validator';
-import { SortOrder } from 'src/permissions/dto/query-permission.dto';
+import { SortOrder } from '../../permissions/dto/query-permission.dto';
 
 export class QueryRoleDto {
   @ApiPropertyOptional({ example: 1, description: 'Trang hiện tại' })

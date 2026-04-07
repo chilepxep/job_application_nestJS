@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { IProfileStrategy } from './profile.strategy.interface';
-import { UserDocument } from 'src/users/schemas/user.schemas';
-import { CompaniesService } from 'src/companies/companies.service';
+import { CompaniesService } from '../../../companies/companies.service';
+import { UserDocument } from '../../../users/schemas/user.schemas';
 
 @Injectable()
 export class HrStrategy implements IProfileStrategy {

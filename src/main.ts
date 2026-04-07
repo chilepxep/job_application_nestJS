@@ -9,6 +9,8 @@ import { TransformInterceptor } from './core/transform.interceptor';
 import { HttpExceptionFilter } from './core/http-exception.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { PermissionGuard } from './common/guards/permission.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -89,6 +91,18 @@ async function bootstrap() {
 
   // Đăng ký TransformInterceptor chuẩn hoá dữ liệu trả về
   app.useGlobalInterceptors(app.get(TransformInterceptor));
+
+  //guards
+  const reflector = app.get(Reflector);
+
+  // Đăng ký global guards
+  // Thứ tự quan trọng:
+  // 1. JwtAuthGuard  → verify token trước
+  // 2. PermissionGuard → check quyền sau
+  app.useGlobalGuards(
+    new JwtAuthGuard(reflector),
+    new PermissionGuard(reflector),
+  );
 
   // filter
   app.useGlobalFilters(

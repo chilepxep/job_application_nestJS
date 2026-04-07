@@ -17,11 +17,12 @@ import {
   ApiTags,
   ApiParam,
 } from '@nestjs/swagger';
-import { ResponseMessage } from 'src/decorator/customize';
-import { CurrentUser } from 'src/decorator/current-user.decorator';
-import { IUser } from 'src/common/interfaces/user.interface';
+
 import { QueryCompanyDto } from './dto/query-company.dto';
 import { Types } from 'mongoose';
+import { IUser } from '../common/interfaces/user.interface';
+import { ResponseMessage } from '../decorator/customize';
+import { CurrentUser } from '../decorator/current-user.decorator';
 
 const mockUser: IUser = {
   _id: new Types.ObjectId('69c4eb29eca9f1a140f46149'),

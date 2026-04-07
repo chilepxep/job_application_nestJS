@@ -4,7 +4,8 @@ import { Permission } from '../../permissions/schemas/permission.schema';
 import {
   AuditUser,
   AuditUserSchema,
-} from 'src/common/Schemas/audit-user.schema';
+} from '../../common/Schemas/audit-user.schema';
+
 export type RoleDocument = HydratedDocument<Role> & {
   createdAt: Date;
   updatedAt: Date;

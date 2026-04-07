@@ -9,9 +9,10 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Role, RoleDocument } from './schemas/role.schemas';
 import mongoose, { Model } from 'mongoose';
-import { IUser } from 'src/common/interfaces/user.interface';
+
 import { QueryRoleDto } from './dto/query-role.dto';
-import { SortOrder } from 'src/permissions/dto/query-permission.dto';
+import { SortOrder } from '../permissions/dto/query-permission.dto';
+import { IUser } from '../common/interfaces/user.interface';
 
 @Injectable()
 export class RolesService {

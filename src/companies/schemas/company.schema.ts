@@ -1,10 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
-import { Address, AddressSchema } from 'src/common/Schemas/address.schema';
+import { Address, AddressSchema } from '../../common/Schemas/address.schema';
 import {
   AuditUser,
   AuditUserSchema,
-} from 'src/common/Schemas/audit-user.schema';
+} from '../../common/Schemas/audit-user.schema';
 
 export type CompaniesDocument = HydratedDocument<Company> & {
   createdAt: Date;

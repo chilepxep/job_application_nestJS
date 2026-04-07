@@ -3,9 +3,9 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schemas/user.schemas';
-import { RolesModule } from 'src/roles/roles.module';
-import { CompaniesModule } from 'src/companies/companies.module';
-import { ProfileStrategyModule } from 'src/common/strategies/profile/profile-strategy.module';
+import { RolesModule } from '../roles/roles.module';
+import { CompaniesModule } from '../companies/companies.module';
+import { ProfileStrategyModule } from '../common/strategies/profile/profile-strategy.module';
 
 @Module({
   imports: [

@@ -1,11 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Query } from 'mongoose';
+import { Company } from '../../companies/schemas/company.schema';
+import { Role } from '../../roles/schemas/role.schemas';
 import {
   AuditUser,
   AuditUserSchema,
-} from 'src/common/Schemas/audit-user.schema';
-import { Company } from 'src/companies/schemas/company.schema';
-import { Role } from 'src/roles/schemas/role.schemas';
+} from '../../common/Schemas/audit-user.schema';
+import { Profile, ProfileSchema } from '../../common/Schemas/profile.schema';
 
 export type UserDocument = HydratedDocument<User> & {
   createdAt: Date;
@@ -13,25 +14,6 @@ export type UserDocument = HydratedDocument<User> & {
 };
 
 //dùng chung cho tất cả
-@Schema({ _id: false })
-class Profile {
-  @Prop({ trim: true })
-  fullName: string;
-
-  @Prop({ trim: true })
-  phone: string;
-
-  @Prop()
-  avatar: string;
-
-  @Prop()
-  dateOfBirth: Date;
-
-  @Prop({ enum: ['male', 'female', 'other'] })
-  gender: string;
-}
-const ProfileSchema = SchemaFactory.createForClass(Profile);
-
 @Schema({ _id: false })
 class CandidateSubscription {
   //hạng mức

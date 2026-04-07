@@ -1,4 +1,4 @@
-import { UserDocument } from 'src/users/schemas/user.schemas';
+import { UserDocument } from '../../../users/schemas/user.schemas';
 
 //interface quy định chung
 export interface IProfileStrategy {

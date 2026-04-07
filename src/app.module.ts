@@ -15,6 +15,7 @@ import { PermissionsModule } from './permissions/permissions.module';
 import { RolesModule } from './roles/roles.module';
 import { CompaniesModule } from './companies/companies.module';
 import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -63,6 +64,8 @@ import { UsersModule } from './users/users.module';
     CompaniesModule,
 
     UsersModule,
+
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [

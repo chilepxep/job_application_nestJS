@@ -3,7 +3,7 @@ import mongoose, { HydratedDocument, Query } from 'mongoose';
 import {
   AuditUser,
   AuditUserSchema,
-} from 'src/common/Schemas/audit-user.schema';
+} from '../../common/Schemas/audit-user.schema';
 
 export type PermissionDocument = HydratedDocument<Permission> & {
   createdAt: Date;
