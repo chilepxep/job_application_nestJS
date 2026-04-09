@@ -18,6 +18,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { SeedingModule } from './seeding/seeding.module';
 import { SeedingService } from './seeding/seeding.service';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -70,6 +71,8 @@ import { SeedingService } from './seeding/seeding.service';
     AuthModule,
 
     SeedingModule,
+
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [
