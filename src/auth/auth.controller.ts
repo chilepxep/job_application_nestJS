@@ -19,6 +19,7 @@ import { IUser } from '../common/interfaces/user.interface';
 import { RegisterDto } from './dto/register.dto.';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { RegisterHrDto } from './dto/register-hr.dto';
+import { ApiPermission } from '../decorator/api-permission.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -108,6 +109,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Đăng xuất thành công')
+  @ApiPermission('Đăng xuất', 'AUTH', ['ADMIN', 'HR', 'CANDIDATE'])
   @ApiOperation({ summary: 'Đăng xuất' })
   @ApiBearerAuth('access-token')
   logout(
@@ -125,6 +127,7 @@ export class AuthController {
   // ───────────────────────────────────────────
   @Get('me')
   @ResponseMessage('Lấy thông tin thành công')
+  @ApiPermission('Lấy thông tin từ token', 'AUTH', ['ADMIN', 'HR', 'CANDIDATE'])
   @ApiOperation({ summary: 'Lấy thông tin user từ token' })
   @ApiBearerAuth('access-token')
   getMe(@CurrentUser() user: IUser) {

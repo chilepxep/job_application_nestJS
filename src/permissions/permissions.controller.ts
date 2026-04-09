@@ -19,6 +19,7 @@ import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { IUser } from '../common/interfaces/user.interface';
 import { ResponseMessage } from '../decorator/customize';
 import { CurrentUser } from '../decorator/current-user.decorator';
+import { ApiPermission } from '../decorator/api-permission.decorator';
 
 @Controller('permissions')
 @ApiTags('Permissions')
@@ -29,6 +30,7 @@ export class PermissionsController {
 
   @Post()
   @ApiOperation({ summary: 'Tạo permission mới' })
+  @ApiPermission('Tạo permission', 'PERMISSIONS', ['ADMIN'])
   @ResponseMessage('tạo mới permission thành công')
   create(@Body() dto: CreatePermissionDto, @CurrentUser() user: IUser) {
     return this.permissionsService.create(dto, user);
@@ -36,6 +38,7 @@ export class PermissionsController {
 
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách permissions' })
+  @ApiPermission('Xem danh sách permissions', 'PERMISSIONS', ['ADMIN'])
   @ResponseMessage('lấy danh sách permission thành công')
   findAll(@Query() query: QueryPermissionDto) {
     return this.permissionsService.findAll(query);
@@ -43,6 +46,7 @@ export class PermissionsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết permission' })
+  @ApiPermission('Xem chi tiết permission', 'PERMISSIONS', ['ADMIN'])
   @ResponseMessage('xem chi tiết permission thành công')
   findOne(@Param('id') id: string) {
     return this.permissionsService.findOne(id);
@@ -50,6 +54,7 @@ export class PermissionsController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Cập nhật permission' })
+  @ApiPermission('Cập nhật permission', 'PERMISSIONS', ['ADMIN'])
   @ResponseMessage('cập nhật permission thành công')
   update(
     @Param('id') id: string,
@@ -61,6 +66,7 @@ export class PermissionsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Xoá permission' })
+  @ApiPermission('Xoá permission', 'PERMISSIONS', ['ADMIN'])
   @ResponseMessage('xoá permission thành công')
   remove(@Param('id') id: string, @CurrentUser() user: IUser) {
     return this.permissionsService.remove(id, user);

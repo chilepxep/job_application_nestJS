@@ -34,9 +34,6 @@ export class PermissionGuard implements CanActivate {
 
     const permissions = user?.role?.permissions ?? [];
 
-    console.log(`permissions:${permissions}`);
-    console.log(`routePath: ${routePath}`);
-
     // So sánh
     const hasPermission = permissions.some(
       (p: any) => p.method === method && p.apiPath === routePath,
