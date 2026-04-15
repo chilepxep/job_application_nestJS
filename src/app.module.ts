@@ -11,6 +11,14 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { WinstonModule } from 'nest-winston';
 import { loggerConfig } from './config/logger.config';
+import { PermissionsModule } from './permissions/permissions.module';
+import { RolesModule } from './roles/roles.module';
+import { CompaniesModule } from './companies/companies.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+import { SeedingModule } from './seeding/seeding.module';
+import { SeedingService } from './seeding/seeding.service';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -51,6 +59,20 @@ import { loggerConfig } from './config/logger.config';
 
     //logger
     WinstonModule.forRoot(loggerConfig),
+
+    PermissionsModule,
+
+    RolesModule,
+
+    CompaniesModule,
+
+    UsersModule,
+
+    AuthModule,
+
+    SeedingModule,
+
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [
