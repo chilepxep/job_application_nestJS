@@ -30,8 +30,17 @@ export class JobsService {
     }
   }
 
+  private extractId(value: any): string {
+    if (!value) return '';
+    // Đã populate → là object có _id
+    if (value._id) return value._id.toString();
+    // Chưa populate → là ObjectId
+    return value.toString();
+  }
+
   async create(createJobDto: CreateJobDto, user: IUser) {
     const roleName = user.role.name;
+
     let companyId: string;
 
     if (roleName === 'HR') {
@@ -39,14 +48,17 @@ export class JobsService {
       //không lấy companyId từ Dto
       const hrUser = await this.usersService.findOne(user._id.toString());
       const company = hrUser.hrProfile?.company;
-
       if (!company) {
         throw new BadRequestException(
           'Bạn chưa tham gia công ty. Vui lòng cập nhật công ty trong tài khoản',
         );
       }
 
-      companyId = company.toString();
+      if ('_id' in company) {
+        companyId = company._id.toString();
+      } else {
+        companyId = company.toString();
+      }
       //kiểm tra công ty được phê duyệt chưa
       const companyDoc = await this.companiesService.findOne(companyId);
       if (!companyDoc) {
@@ -339,8 +351,10 @@ export class JobsService {
     //HR chỉ được sửa job của mình
     if (
       roleName !== 'ADMIN' &&
-      job.createdByUser?.toString() !== user._id.toString()
+      this.extractId(job.createdByUser) !== user._id.toString()
     ) {
+      console.log(job.createdByUser);
+      console.log(user._id);
       throw new ForbiddenException('Bạn không có quyền sửa job này');
     }
 
@@ -379,7 +393,7 @@ export class JobsService {
     // HR chỉ được toggle job của mình
     if (
       roleName !== 'ADMIN' &&
-      job.createdByUser?.toString() !== user._id.toString()
+      this.extractId(job.createdByUser) !== user._id.toString()
     ) {
       throw new ForbiddenException(
         'Bạn không có quyền thay đổi trạng thái job này',
@@ -455,6 +469,16 @@ export class JobsService {
   async remove(id: string, user: IUser) {
     this.validateObjectId(id);
     await this.findOne(id);
+
+    const job = await this.findOne(id);
+    const roleName = user.role.name;
+    // HR chỉ được xoá job của mình
+    if (
+      roleName !== 'ADMIN' &&
+      this.extractId(job.createdByUser) !== user._id.toString()
+    ) {
+      throw new ForbiddenException('Bạn không có quyền xoá job này');
+    }
 
     await this.jobModel.updateOne(
       { _id: id },

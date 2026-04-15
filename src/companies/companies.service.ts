@@ -141,7 +141,7 @@ export class CompaniesService {
   //xem chi tiết công ty
   async findOne(id: string): Promise<CompaniesDocument> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('ID không hợp lệ');
+      throw new BadRequestException('ID vvv không hợp lệ');
     }
 
     const company = await this.companyModel.findById(id).select('-__v').exec();

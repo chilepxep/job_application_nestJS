@@ -122,7 +122,7 @@ export class JobsController {
   @ResponseMessage('Xoá job thành công')
   @ApiOperation({ summary: 'Xoá job' })
   @ApiParam({ name: 'id', description: 'Job ID' })
-  @ApiPermission('Xoá job', 'JOBS', ['ADMIN'])
+  @ApiPermission('Xoá job', 'JOBS', ['ADMIN', 'HR'])
   remove(@Param('id') id: string, @CurrentUser() user: IUser) {
     return this.jobsService.remove(id, user);
   }
