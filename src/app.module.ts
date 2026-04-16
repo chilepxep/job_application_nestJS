@@ -19,6 +19,7 @@ import { AuthModule } from './auth/auth.module';
 import { SeedingModule } from './seeding/seeding.module';
 import { SeedingService } from './seeding/seeding.service';
 import { JobsModule } from './jobs/jobs.module';
+import { ApplicationModule } from './application/application.module';
 
 @Module({
   imports: [
@@ -73,6 +74,8 @@ import { JobsModule } from './jobs/jobs.module';
     SeedingModule,
 
     JobsModule,
+
+    ApplicationModule,
   ],
   controllers: [AppController],
   providers: [
