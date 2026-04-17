@@ -11,6 +11,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
+import path from 'path';
+import express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -43,8 +45,11 @@ async function bootstrap() {
     defaultVersion: '1', // Mặc định dùng v1
   });
 
+  const configService = app.get(ConfigService);
+  const nodeEnv = configService.get<string>('NODE_ENV');
+
   //bật khi môi trường khác production
-  if (process.env.NODE_ENV !== 'production') {
+  if (nodeEnv !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('Job Application API')
       .setDescription('API document cho Job Application')
@@ -86,7 +91,7 @@ async function bootstrap() {
   });
 
   // Đọc PORT từ config
-  const configService = app.get(ConfigService);
+
   const port = configService.get<number>('PORT') ?? 3000;
 
   // Đăng ký TransformInterceptor chuẩn hoá dữ liệu trả về
@@ -108,6 +113,9 @@ async function bootstrap() {
   app.useGlobalFilters(
     new HttpExceptionFilter(app.get(WINSTON_MODULE_NEST_PROVIDER)),
   );
+
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
   app.enableShutdownHooks();
   await app.listen(port);
 
