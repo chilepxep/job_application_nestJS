@@ -6,6 +6,7 @@ import { FileUploadService } from './services/file-upload.service';
 import { UploadFactory } from './upload.factory';
 import { LocalStrategy } from './strategies/local.strategy';
 import { ConfigModule } from '@nestjs/config';
+import { CloudinaryStrategy } from './strategies/cloudinary.strategy';
 
 @Module({
   imports: [ConfigModule],
@@ -16,7 +17,7 @@ import { ConfigModule } from '@nestjs/config';
     FileUploadService,
     UploadFactory,
     LocalStrategy,
-    // CloudinaryStrategy (sau)
+    CloudinaryStrategy,
     // SupabaseStrategy (sau)
   ],
 })

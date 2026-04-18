@@ -13,14 +13,21 @@ export class UploadService {
   ) {}
 
   async uploadImage(file: Express.Multer.File, options?: UploadOptions) {
-    const result = await this.imageUploadService.upload(file, options);
-    return this.buildFileUrl(result);
+    try {
+      const result = await this.imageUploadService.upload(file, options);
+      return this.buildFileUrl(result);
+    } catch (error) {
+      throw error;
+    }
   }
 
   async uploadFile(file: Express.Multer.File, options?: UploadOptions) {
-    const result = await this.fileUploadService.upload(file, options);
-
-    return this.buildFileUrl(result);
+    try {
+      const result = await this.fileUploadService.upload(file, options);
+      return this.buildFileUrl(result);
+    } catch (error) {
+      throw error;
+    }
   }
 
   private buildFileUrl(result: any) {

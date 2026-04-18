@@ -4,13 +4,14 @@ import { StorageType } from './constants/storage.constant';
 import { IStorageStrategy } from './interfaces/storage-strategy.interface';
 
 import { LocalStrategy } from './strategies/local.strategy';
+import { CloudinaryStrategy } from './strategies/cloudinary.strategy';
 
 @Injectable()
 export class UploadFactory {
   private readonly logger = new Logger(UploadFactory.name);
   constructor(
     private readonly configService: ConfigService,
-    // private readonly cloudinaryStrategy: CloudinaryStrategy,
+    private readonly cloudinaryStrategy: CloudinaryStrategy,
     private readonly localStrategy: LocalStrategy,
     // private readonly supabaseStrategy: SupabaseStrategy,
   ) {}
@@ -21,7 +22,7 @@ export class UploadFactory {
     switch (type) {
       case StorageType.CLOUDINARY:
         console.log('Using cloudinary strategy');
-        return this.localStrategy;
+        return this.cloudinaryStrategy;
 
       case StorageType.LOCAL:
         console.log('Using local strategy');
