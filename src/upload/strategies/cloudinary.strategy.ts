@@ -48,10 +48,11 @@ export class CloudinaryStrategy implements IStorageStrategy {
               new InternalServerErrorException('Upload to Cloudinary failed'),
             );
           }
-
           resolve({
             //https
             url: result.secure_url,
+            resourceType: result.resource_type,
+            storageKey: result.public_id,
             fileName: result.public_id,
             size: result.bytes,
             mimetype: `${result.resource_type}/${result.format}`,
@@ -61,5 +62,23 @@ export class CloudinaryStrategy implements IStorageStrategy {
 
       Readable.from(file.buffer).pipe(uploadStream);
     });
+  }
+
+  async delete(key: string, resourceType: string): Promise<boolean> {
+    try {
+      const result = await cloudinary.uploader.destroy(key, {
+        invalidate: true,
+        resource_type: resourceType,
+      });
+
+      //ok hoặc không tồn tại đều coi như thành công
+      if (result.result === 'ok' || result.result === 'not found') {
+        return true;
+      }
+
+      throw new Error(`Cloudinary delete failed: ${result.result}`);
+    } catch (error) {
+      throw new Error('Delete from Cloudinary failed');
+    }
   }
 }

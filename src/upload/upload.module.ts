@@ -7,9 +7,11 @@ import { UploadFactory } from './upload.factory';
 import { LocalStrategy } from './strategies/local.strategy';
 import { ConfigModule } from '@nestjs/config';
 import { CloudinaryStrategy } from './strategies/cloudinary.strategy';
+import { UploadCleanupService } from './upload-cleanup.service';
+import { FilesModule } from '../files/files.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, FilesModule],
   controllers: [UploadController],
   providers: [
     UploadService,
@@ -18,7 +20,9 @@ import { CloudinaryStrategy } from './strategies/cloudinary.strategy';
     UploadFactory,
     LocalStrategy,
     CloudinaryStrategy,
+    UploadCleanupService,
     // SupabaseStrategy (sau)
   ],
+  exports: [UploadService],
 })
 export class UploadModule {}

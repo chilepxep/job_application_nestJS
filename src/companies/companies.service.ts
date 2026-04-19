@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
@@ -13,29 +14,54 @@ import mongoose, { Model } from 'mongoose';
 import { QueryCompanyDto } from './dto/query-company.dto';
 import { IUser } from '../common/interfaces/user.interface';
 import { SortOrder } from '../permissions/dto/query-permission.dto';
+import { FilesService } from '../files/files.service';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class CompaniesService {
+  private readonly logger = new Logger(CompaniesService.name);
   constructor(
     @InjectModel(Company.name)
     private companyModel: Model<CompaniesDocument>,
+    private filesService: FilesService,
+    private uploadService: UploadService,
   ) {}
 
   async create(createCompanyDto: CreateCompanyDto, user: IUser) {
+    const { logoId, ...rest } = createCompanyDto;
     const isActive =
       user.role.name === 'ADMIN'
         ? (createCompanyDto.isActive ?? true) // Admin không truyền → true
         : false;
+    let logoUrl: string | undefined;
+    let logoFileId: any = null;
+
+    if (logoId) {
+      const file = await this.filesService.validateForUse(
+        logoId,
+        user._id.toString(),
+      );
+
+      logoUrl = file.url;
+      logoFileId = file._id;
+    }
     const company = await this.companyModel.create({
-      ...createCompanyDto,
+      ...rest,
+      logo: logoUrl,
+      logoFileId,
       isActive, // ← đặt sau spread để override
       createdByUser: user._id,
       createdBy: { _id: user._id, email: user.email },
     });
 
+    if (logoId) {
+      await this.filesService.markAsActive(logoId, company._id.toString());
+    }
+
     return {
       _id: company._id,
       name: company.name,
+      logo: company.logo,
       isActive: company.isActive,
       createdAt: company.createdAt,
     };
@@ -163,7 +189,7 @@ export class CompaniesService {
 
     const company = await this.findOne(id);
 
-    // HR chỉ được update công ty do mình tạo
+    // Phân quyền
     if (
       user.role.name !== 'ADMIN' &&
       company.createdByUser?.toString() !== user._id.toString()
@@ -171,24 +197,69 @@ export class CompaniesService {
       throw new ForbiddenException('Bạn không có quyền cập nhật công ty này');
     }
 
-    // HR không được tự set isActive
-    if (user.role.name !== 'ADMIN') {
-      delete dto.isActive;
+    // Tách dto, không mutate tham số đầu vào
+    const { logoId, isActive, ...rest } = dto;
+    const safeFields =
+      user.role.name === 'ADMIN' ? { ...rest, isActive } : rest;
+
+    // Xử lý logo
+    const isSameLogo = logoId && company.logoFileId?.toString() === logoId;
+
+    let newLogoUrl = company.logo;
+    let newLogoFileId = company.logoFileId;
+
+    if (logoId && !isSameLogo) {
+      // ADMIN có thể update logo của bất kỳ ai → không check owner
+      const file =
+        user.role.name === 'ADMIN'
+          ? await this.filesService.findById(logoId)
+          : await this.filesService.validateForUse(logoId, user._id.toString());
+
+      if (!file) {
+        throw new BadRequestException('File logo không hợp lệ');
+      }
+
+      newLogoUrl = file.url;
+      newLogoFileId = file._id;
     }
 
     const updated = await this.companyModel
       .findByIdAndUpdate(
         id,
         {
-          ...dto,
+          ...safeFields,
+          logo: newLogoUrl,
+          logoFileId: newLogoFileId,
           updatedBy: { _id: user._id, email: user.email },
         },
         { returnDocument: 'after' },
       )
-      .select('-__v');
+      .select('-__v')
+      .lean();
 
     if (!updated) {
       throw new NotFoundException('Không tìm thấy công ty');
+    }
+
+    // Xử lý file sau khi update DB thành công
+    if (logoId && !isSameLogo) {
+      // 1. Mark file mới là ACTIVE
+      await this.filesService.markAsActive(logoId, updated._id.toString());
+
+      // 2. Xóa logo cũ nếu có — lỗi chỉ log
+      if (company.logoFileId) {
+        try {
+          await this.uploadService.deleteFileById(
+            company.logoFileId.toString(),
+          );
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          this.logger.warn(
+            `[CompanyService] Không xóa được logo cũ (id=${company.logoFileId}): ${error.message}`,
+            error.stack,
+          );
+        }
+      }
     }
 
     return updated;

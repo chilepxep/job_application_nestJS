@@ -5,6 +5,7 @@ import { IStorageStrategy } from './interfaces/storage-strategy.interface';
 
 import { LocalStrategy } from './strategies/local.strategy';
 import { CloudinaryStrategy } from './strategies/cloudinary.strategy';
+import { StorageProvider } from '../files/schemas/file.schema';
 
 @Injectable()
 export class UploadFactory {
@@ -16,6 +17,7 @@ export class UploadFactory {
     // private readonly supabaseStrategy: SupabaseStrategy,
   ) {}
 
+  //chọn strategy khi upload Image
   getImageStrategy(): IStorageStrategy {
     const type = this.configService.get<StorageType>('upload.imageStorage');
     this.logger.log(`Image storage strategy: ${type}`);
@@ -32,6 +34,7 @@ export class UploadFactory {
     }
   }
 
+  //chọn strategy khi upload FILE (CV)
   getFileStrategy(): IStorageStrategy {
     const type = this.configService.get<StorageType>('upload.fileStorage');
     this.logger.log(`Image storage strategy: ${type}`);
@@ -45,6 +48,23 @@ export class UploadFactory {
         return this.localStrategy;
       default:
         return this.localStrategy;
+    }
+  }
+
+  //dùng cho delete
+  getStrategyByProvider(provider: StorageProvider): IStorageStrategy {
+    switch (provider) {
+      case StorageProvider.LOCAL:
+        return this.localStrategy;
+
+      case StorageProvider.CLOUDINARY:
+        return this.cloudinaryStrategy;
+
+      // case StorageProvider.SUPABASE:
+      //   return this.supabaseStrategy;
+
+      default:
+        throw new Error('Invalid provider');
     }
   }
 }

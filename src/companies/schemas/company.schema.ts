@@ -19,6 +19,13 @@ export class Company {
   @Prop()
   logo: string;
 
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'File',
+    default: null,
+  })
+  logoFileId: mongoose.Types.ObjectId;
+
   @Prop({ trim: true })
   website: string;
 

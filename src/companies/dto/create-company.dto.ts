@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsMongoId,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -36,12 +37,13 @@ export class CreateCompanyDto {
   name: string;
 
   @ApiPropertyOptional({
-    example: 'https://storage.example.com/logo.png',
-    description: 'URL logo công ty',
+    example: '64a1b2c3d4e5f6a7b8c9d0e1',
+    description: 'Id từ upload file',
   })
+  @IsMongoId()
   @IsOptional()
   @IsString()
-  logo?: string;
+  logoId?: string;
 
   @ApiPropertyOptional({
     example: 'https://google.com',

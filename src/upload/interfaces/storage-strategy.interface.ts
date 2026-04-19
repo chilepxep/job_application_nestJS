@@ -1,9 +1,11 @@
 import 'multer';
 export interface UploadResult {
   url: string;
+  storageKey: string;
   fileName: string;
   size: number;
   mimetype: string;
+  resourceType?: string;
 }
 
 export interface UploadOptions {
@@ -16,4 +18,6 @@ export interface IStorageStrategy {
     file: Express.Multer.File,
     options?: UploadOptions,
   ): Promise<UploadResult>;
+
+  delete(key: string, resourceType?: string): Promise<boolean>;
 }

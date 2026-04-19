@@ -21,7 +21,9 @@ import { SeedingService } from './seeding/seeding.service';
 import { JobsModule } from './jobs/jobs.module';
 import { ApplicationModule } from './application/application.module';
 import { UploadModule } from './upload/upload.module';
+import { FilesModule } from './files/files.module';
 import uploadConfig from './config/upload.config';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -77,6 +79,8 @@ import uploadConfig from './config/upload.config';
     //logger
     WinstonModule.forRoot(loggerConfig),
 
+    ScheduleModule.forRoot(),
+
     PermissionsModule,
 
     RolesModule,
@@ -94,6 +98,8 @@ import uploadConfig from './config/upload.config';
     ApplicationModule,
 
     UploadModule,
+
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [

@@ -30,6 +30,12 @@ export class LocalStrategy implements IStorageStrategy {
       const fileName = this.generateFileName(file.originalname);
       const filePath = path.join(uploadDir, fileName);
 
+      const relativePath = userId
+        ? path.join(folder, userId, fileName)
+        : path.join(folder, fileName);
+
+      const storageKey = path.join('uploads', relativePath);
+
       await fs.promises.writeFile(filePath, file.buffer);
 
       const url = userId
@@ -39,12 +45,35 @@ export class LocalStrategy implements IStorageStrategy {
       return {
         url,
         fileName,
+        storageKey,
         size: file.size,
         mimetype: file.mimetype,
       };
     } catch (error) {
       console.error('UPLOAD ERROR:', error);
       throw new InternalServerErrorException('Failed to upload file locally');
+    }
+  }
+
+  async delete(filePath: string): Promise<boolean> {
+    try {
+      const fullPath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(process.cwd(), filePath);
+
+      // check tồn tại
+      await fs.promises.access(fullPath);
+
+      await fs.promises.unlink(fullPath);
+
+      return true;
+    } catch (error: any) {
+      //file không tồn tại coi như đã xoá
+      if (error.code === 'ENOENT') {
+        return true;
+      }
+
+      throw new Error('Delete local file failed');
     }
   }
 
