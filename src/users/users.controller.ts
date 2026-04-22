@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Query,
+  Put,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -19,7 +20,7 @@ import {
 } from '@nestjs/swagger';
 
 import { QueryUserDto } from './dto/query-user.dto';
-import { UpdateMeDto } from './dto/update-me.dto';
+import { AddCvDto, ReplaceCvDto, UpdateMeDto } from './dto/update-me.dto';
 import { Types } from 'mongoose';
 import { IUser } from '../common/interfaces/user.interface';
 import { ResponseMessage } from '../decorator/customize';
@@ -90,6 +91,39 @@ export class UsersController {
   @ApiParam({ name: 'id', description: 'User ID' })
   toggleActive(@Param('id') id: string, @CurrentUser() user: IUser) {
     return this.usersService.toggleActive(id, user);
+  }
+
+  //user thêm cv
+  @Post('me/cvs')
+  @ResponseMessage('Thêm CV thành công')
+  @ApiPermission('Thêm CV', 'USERS', ['CANDIDATE', 'ADMIN'])
+  @ApiOperation({ summary: 'Thêm CV [Candidate]' })
+  addCv(@Body() dto: AddCvDto, @CurrentUser() user: IUser) {
+    return this.usersService.addCv(user._id.toString(), dto, user);
+  }
+
+  //user xoá cv
+  @Delete('me/cvs/:fileId')
+  @ResponseMessage('Xóa CV thành công')
+  @ApiPermission('Xóa CV', 'USERS', ['CANDIDATE', 'ADMIN'])
+  @ApiOperation({ summary: 'Xóa 1 CV [Candidate]' })
+  @ApiParam({ name: 'fileId', description: 'File ID của CV cần xóa' })
+  removeCv(@Param('fileId') fileId: string, @CurrentUser() user: IUser) {
+    return this.usersService.removeCv(user._id.toString(), fileId, user);
+  }
+
+  //user thay thế cv
+  @Put('me/cvs/:fileId')
+  @ResponseMessage('Thay thế CV thành công')
+  @ApiPermission('Thay thế CV', 'USERS', ['CANDIDATE', 'ADMIN'])
+  @ApiOperation({ summary: 'Thay thế 1 CV [Candidate]' })
+  @ApiParam({ name: 'fileId', description: 'File ID của CV cần thay thế' })
+  replaceCv(
+    @Param('fileId') fileId: string,
+    @Body() dto: ReplaceCvDto,
+    @CurrentUser() user: IUser,
+  ) {
+    return this.usersService.replaceCv(user._id.toString(), fileId, dto, user);
   }
 
   //admin update bất kì

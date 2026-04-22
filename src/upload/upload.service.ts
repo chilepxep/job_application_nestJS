@@ -12,8 +12,6 @@ import { UploadFactory } from './upload.factory';
 @Injectable()
 export class UploadService {
   constructor(
-    private readonly imageUploadService: ImageUploadService,
-    private readonly fileUploadService: FileUploadService,
     private readonly configService: ConfigService,
     private readonly filesService: FilesService,
     private readonly uploadFactory: UploadFactory,
@@ -56,7 +54,7 @@ export class UploadService {
   async uploadFile(file: Express.Multer.File, options?: UploadOptions) {
     let result: any;
     try {
-      const strategy = this.uploadFactory.getImageStrategy();
+      const strategy = this.uploadFactory.getFileStrategy();
 
       result = await strategy.upload(file, options);
 
@@ -96,15 +94,14 @@ export class UploadService {
     await strategy.delete(result.storageKey);
   }
 
-  private buildFileUrl(result: any) {
-    const baseUrl = this.configService.get<string>('APP_URL');
-
-    return {
-      ...result,
-      url: result.url.startsWith('http')
-        ? result.url // cloud (Cloudinary, Supabase)
-        : `${baseUrl}${result.url}`, // local
-    };
+  //xoá cứng nơi lưu
+  async deletePhysicalFile(
+    storageKey: string,
+    provider: StorageProvider,
+    resourceType?: string,
+  ): Promise<void> {
+    const strategy = this.uploadFactory.getStrategyByProvider(provider);
+    await strategy.delete(storageKey, resourceType);
   }
 
   //xác định nơi lưu trữ
@@ -121,17 +118,15 @@ export class UploadService {
   }
 
   async deleteFileById(fileId: string) {
-    //1. lấy file từ DB
     const file = await this.filesService.findById(fileId);
 
-    //2. lấy strategy đúng
-    const strategy = this.uploadFactory.getStrategyByProvider(file.provider);
-
-    //3.xóa file vật lý
-    await strategy.delete(file.storageKey, file.resourceType);
-
-    //4. xóa DB
+    await this.deletePhysicalFile(
+      file.storageKey,
+      file.provider,
+      file.resourceType,
+    );
     await this.filesService.deleteRecord(fileId);
+
     return { message: 'Delete file success' };
   }
 }

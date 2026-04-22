@@ -27,7 +27,7 @@ export class UploadController {
   @ApiOperation({ summary: 'Upload ảnh logo công ty [HR/Admin]' })
   @ApiPermission('Upload ảnh logo', 'UPLOAD', ['ADMIN', 'HR'])
   @UseInterceptors(FileInterceptor('file'))
-  async testUpload(
+  async UploadImage(
     @UploadedFile(
       new FileValidationPipe({
         maxSizeMB: 2,
@@ -43,8 +43,10 @@ export class UploadController {
     });
   }
 
-  @Public()
-  @Post('test-upload-cv')
+  @Post('upload-cv')
+  @ResponseMessage('Upload CV thành công')
+  @ApiOperation({ summary: 'Upload CV ứng viên' })
+  @ApiPermission('Upload CV', 'UPLOAD', ['ADMIN', 'CANDIDATE'])
   @UseInterceptors(FileInterceptor('file'))
   async testUploadCV(
     @UploadedFile(

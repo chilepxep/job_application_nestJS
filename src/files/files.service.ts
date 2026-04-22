@@ -15,6 +15,8 @@ import {
   StorageProvider,
 } from './schemas/file.schema';
 
+import { ClientSession } from 'mongoose';
+
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name);
@@ -67,26 +69,41 @@ export class FilesService {
   }
 
   //gán cho resource (company)
-  async markAsActive(fileId: string, relatedId: string) {
+  async markAsActive(
+    fileId: string,
+    relatedId: string,
+    session?: ClientSession,
+  ) {
     return this.fileModel.findByIdAndUpdate(
       fileId,
       {
         status: FileStatus.ACTIVE,
         relatedId,
       },
-      { returnDocument: 'after' },
+      { returnDocument: 'after', session },
     );
   }
 
   //xoá trong DB
-  async deleteRecord(fileId: string) {
-    return this.fileModel.findByIdAndDelete(fileId);
+  async deleteRecord(fileId: string, session?: ClientSession) {
+    return this.fileModel.findByIdAndDelete(fileId, { session });
   }
 
-  async findTempFiles(threshold: Date) {
-    return this.fileModel.find({
-      status: FileStatus.TEMP,
-      createdAt: { $lt: threshold },
-    });
+  async claimForCleanup(fileId: string): Promise<FileDocument | null> {
+    return this.fileModel.findOneAndUpdate(
+      { _id: fileId, status: FileStatus.TEMP },
+      { status: FileStatus.DELETING },
+      { returnDocument: 'after' },
+    );
+  }
+
+  // Giới hạn số file mỗi lần cleanup tránh load hết
+  async findTempFiles(threshold: Date, limit = 100) {
+    return this.fileModel
+      .find({
+        status: FileStatus.TEMP,
+        createdAt: { $lt: threshold },
+      })
+      .limit(limit);
   }
 }

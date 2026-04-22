@@ -9,6 +9,7 @@ import { ConfigModule } from '@nestjs/config';
 import { CloudinaryStrategy } from './strategies/cloudinary.strategy';
 import { UploadCleanupService } from './upload-cleanup.service';
 import { FilesModule } from '../files/files.module';
+import { SupabaseStrategy } from './strategies/supabase.strategy';
 
 @Module({
   imports: [ConfigModule, FilesModule],
@@ -21,7 +22,7 @@ import { FilesModule } from '../files/files.module';
     LocalStrategy,
     CloudinaryStrategy,
     UploadCleanupService,
-    // SupabaseStrategy (sau)
+    SupabaseStrategy,
   ],
   exports: [UploadService],
 })
