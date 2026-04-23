@@ -6,6 +6,7 @@ export type FileDocument = HydratedDocument<File>;
 export enum FileStatus {
   TEMP = 'TEMP',
   ACTIVE = 'ACTIVE',
+  IN_USE = 'IN_USE',
   DELETING = 'DELETING',
 }
 

@@ -1,9 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ImageUploadService } from './services/image-upload.service';
 import { FileUploadService } from './services/file-upload.service';
 import { UploadOptions } from './interfaces/storage-strategy.interface';
 import { ConfigService } from '@nestjs/config';
-import { FileType, StorageProvider } from '../files/schemas/file.schema';
+import {
+  FileStatus,
+  FileType,
+  StorageProvider,
+} from '../files/schemas/file.schema';
 import { FilesService } from '../files/files.service';
 import { LocalStrategy } from './strategies/local.strategy';
 import { CloudinaryStrategy } from './strategies/cloudinary.strategy';
@@ -119,6 +123,10 @@ export class UploadService {
 
   async deleteFileById(fileId: string) {
     const file = await this.filesService.findById(fileId);
+
+    if (file.status === FileStatus.IN_USE) {
+      throw new BadRequestException('Không thể thay thế CV đang được sử dụng');
+    }
 
     await this.deletePhysicalFile(
       file.storageKey,

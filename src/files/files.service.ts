@@ -71,14 +71,14 @@ export class FilesService {
   //gán cho resource (company)
   async markAsActive(
     fileId: string,
-    relatedId: string,
+    relatedId?: string | null,
     session?: ClientSession,
   ) {
     return this.fileModel.findByIdAndUpdate(
       fileId,
       {
         status: FileStatus.ACTIVE,
-        relatedId,
+        relatedId: relatedId ?? null,
       },
       { returnDocument: 'after', session },
     );
@@ -105,5 +105,14 @@ export class FilesService {
         createdAt: { $lt: threshold },
       })
       .limit(limit);
+  }
+
+  //cập nhật trạng thái file đang được dùng
+  async markAsInUse(fileId: string) {
+    return this.fileModel.findByIdAndUpdate(
+      fileId,
+      { status: FileStatus.IN_USE },
+      { returnDocument: 'after' },
+    );
   }
 }

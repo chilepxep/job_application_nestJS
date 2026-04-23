@@ -32,6 +32,7 @@ import { SubscriptionService } from './subscription.service';
 import { FilesService } from '../files/files.service';
 import { withTransaction } from '../common/helpers/with-transaction.helper';
 import { UploadService } from '../upload/upload.service';
+import { FileStatus } from '../files/schemas/file.schema';
 
 @Injectable()
 export class UsersService {
@@ -623,6 +624,10 @@ export class UsersService {
     // lấy file trước
     const fileRecord = await this.filesService.findById(fileId);
 
+    if (fileRecord.status === FileStatus.IN_USE) {
+      throw new BadRequestException('CV đang được sử dụng để ứng tuyển');
+    }
+
     const updated = await withTransaction(
       this.connection,
       async (session: ClientSession) => {
@@ -691,6 +696,10 @@ export class UsersService {
 
     // lấy file cũ
     const oldFileRecord = await this.filesService.findById(oldFileId);
+
+    if (oldFileRecord.status === FileStatus.IN_USE) {
+      throw new BadRequestException('Không thể thay thế CV đang được sử dụng');
+    }
 
     const updated = await withTransaction(
       this.connection,

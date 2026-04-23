@@ -39,8 +39,12 @@ export class Application {
   candidate: mongoose.Types.ObjectId | User;
 
   //Hồ sơ ứng tuyển
-  @Prop({ required: true })
-  cvUrl: string;
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'File',
+    required: true,
+  })
+  cvFileId: mongoose.Types.ObjectId;
 
   //thư giới thiệu
   @Prop({ trim: true })

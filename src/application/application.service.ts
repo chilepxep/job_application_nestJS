@@ -20,6 +20,8 @@ import { JobStatus } from '../jobs/schemas/job.schema';
 import { QueryApplicationDto } from './dto/query-application.dto';
 import { SortOrder } from '../permissions/dto/query-permission.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { FilesService } from '../files/files.service';
+import { FileStatus } from '../files/schemas/file.schema';
 
 @Injectable()
 export class ApplicationService {
@@ -27,6 +29,7 @@ export class ApplicationService {
     @InjectModel(Application.name)
     private applicationModel: Model<ApplicationDocument>,
     private jobService: JobsService,
+    private filesService: FilesService,
   ) {}
 
   //helper
@@ -42,44 +45,114 @@ export class ApplicationService {
     return value.toString();
   }
 
-  async create(createApplicationDto: CreateApplicationDto, user: IUser) {
-    const { job, cvUrl, coverLetter } = createApplicationDto;
+  // async create(createApplicationDto: CreateApplicationDto, user: IUser) {
+  //   const { job, cvFileId, coverLetter } = createApplicationDto;
 
-    this.validateObjectId(job, 'Job ID');
+  //   this.validateObjectId(job, 'Job ID');
+  //   this.validateObjectId(cvFileId, 'CV File ID');
+
+  //   const jobDoc = await this.jobService.findOne(job);
+  //   if (jobDoc.status !== JobStatus.OPEN) {
+  //     throw new BadRequestException('Job này hiện không tiếp nhận hồ sơ');
+  //   }
+
+  //   // check duplicate apply
+  //   const existed = await this.applicationModel.findOne({
+  //     job: new mongoose.Types.ObjectId(job),
+  //     candidate: user._id,
+  //   });
+  //   if (existed) {
+  //     throw new ConflictException('Bạn đã nộp hồ sơ vào job này rồi');
+  //   }
+
+  //   //validate file
+  //   const file = await this.filesService.findById(cvFileId);
+
+  //   if (file.ownerId.toString() !== user._id.toString()) {
+  //     throw new ForbiddenException('Không có quyền sử dụng CV này');
+  //   }
+
+  //   if (file.status !== FileStatus.ACTIVE) {
+  //     throw new BadRequestException('CV chưa sẵn sàng để sử dụng');
+  //   }
+
+  //   //tạo application
+  //   const application = await this.applicationModel.create({
+  //     job: new mongoose.Types.ObjectId(job),
+  //     candidate: user._id,
+
+  //     cvFileId: file._id,
+  //     cvSnapshotUrl: file.url,
+
+  //     coverLetter,
+
+  //     createdBy: {
+  //       _id: user._id,
+  //       email: user.email,
+  //     },
+  //   });
+
+  //   return {
+  //     _id: application._id,
+  //     job: application.job,
+  //     status: application.status,
+  //     createdAt: application.createdAt,
+  //   };
+  // }
+
+  //Candidate xem hồ sơ của mình
+
+  async create(dto: CreateApplicationDto, user: IUser) {
+    const { job, cvFileId, coverLetter } = dto;
+
+    this.validateObjectId(job);
+    this.validateObjectId(cvFileId);
+
     const jobDoc = await this.jobService.findOne(job);
     if (jobDoc.status !== JobStatus.OPEN) {
-      throw new BadRequestException('Job này hiện không tiếp nhận hồ sơ');
+      throw new BadRequestException('Job không nhận hồ sơ');
     }
 
-    //kiểm tra candidate đã nộp job này chưa
-    //dựa vào unique index {job,candidate}
+    const file = await this.filesService.findById(cvFileId);
+
+    // 🔥 check ownership
+    if (file.ownerId.toString() !== user._id.toString()) {
+      throw new ForbiddenException('Không phải CV của bạn');
+    }
+
+    // 🔥 check status
+    if (file.status !== FileStatus.ACTIVE) {
+      throw new BadRequestException('CV không sẵn sàng để apply');
+    }
+
+    // check duplicate apply
     const existed = await this.applicationModel.findOne({
-      job: new mongoose.Types.ObjectId(job),
+      job,
       candidate: user._id,
+      status: { $ne: ApplicationStatus.WITHDRAWN },
     });
+
     if (existed) {
-      throw new ConflictException('Bạn đã nộp hồ sơ vào job này rồi');
+      throw new ConflictException('Bạn đã apply job này');
     }
 
     const application = await this.applicationModel.create({
       job: new mongoose.Types.ObjectId(job),
       candidate: user._id,
-      cvUrl,
+      cvFileId,
       coverLetter,
       createdBy: {
         _id: user._id,
         email: user.email,
       },
     });
-    return {
-      _id: application._id,
-      job: application.job,
-      status: application.status,
-      createdAt: application.createdAt,
-    };
+
+    // 🔥 mark file IN_USE
+    await this.filesService.markAsInUse(cvFileId);
+
+    return application;
   }
 
-  //Candidate xem hồ sơ của mình
   async findMyApplications(query: QueryApplicationDto, user: IUser) {
     const { page = 1, limit = 10, status, sort } = query;
     const skip = (page - 1) * limit;
@@ -294,42 +367,38 @@ export class ApplicationService {
   }
 
   //candidate rút hồ sơ
-  async withdraw(id: string, user: IUser) {
-    this.validateObjectId(id);
+  async withdraw(applicationId: string, user: IUser) {
+    const app = await this.applicationModel.findById(applicationId);
 
-    const application = await this.findOne(id);
-
-    //Chỉ candidate sở hữu mới được rút
-    if (this.extractId(application.candidate) !== user._id.toString()) {
-      throw new ForbiddenException('Bạn không có quyền rút hồ sơ này');
+    if (!app) {
+      throw new NotFoundException('Không tìm thấy application');
     }
 
-    //Chỉ rút được khi đang pending hoặc reviewing
-    if (
-      application.status !== ApplicationStatus.PENDING &&
-      application.status !== ApplicationStatus.REVIEWING
-    ) {
-      throw new BadRequestException(
-        'Chỉ có thể rút hồ sơ khi đang ở trạng thái pending hoặc reviewing',
-      );
+    // chỉ owner mới được withdraw
+    if (app.candidate.toString() !== user._id.toString()) {
+      throw new ForbiddenException('Bạn không có quyền rút hồ sơ');
     }
 
-    const updated = await this.applicationModel
-      .findByIdAndUpdate(
-        id,
-        {
-          status: ApplicationStatus.WITHDRAWN,
-          updatedBy: { _id: user._id, email: user.email },
-        },
-        { returnDocument: 'after' },
-      )
-      .select('-__v');
+    if (app.status === ApplicationStatus.WITHDRAWN) {
+      throw new BadRequestException('Bạn đã rút hồ sơ này rồi');
+    }
 
-    return {
-      _id: updated._id,
-      status: updated.status,
-      message: 'Rút hồ sơ thành công',
-    };
+    // update status
+    app.status = ApplicationStatus.WITHDRAWN;
+    await app.save();
+
+    // kiểm tra CV còn được dùng ở app khác không
+    const stillUsed = await this.applicationModel.exists({
+      cvFileId: app.cvFileId,
+      status: { $ne: ApplicationStatus.WITHDRAWN },
+    });
+
+    //nếu không còn dùng  ACTIVE lại
+    if (!stillUsed) {
+      await this.filesService.markAsActive(app.cvFileId.toString(), null);
+    }
+
+    return { message: 'Withdraw thành công' };
   }
 
   async remove(id: string, user: IUser) {
