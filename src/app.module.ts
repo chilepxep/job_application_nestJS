@@ -24,6 +24,7 @@ import { UploadModule } from './upload/upload.module';
 import { FilesModule } from './files/files.module';
 import uploadConfig from './config/upload.config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -100,6 +101,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     UploadModule,
 
     FilesModule,
+
+    AiModule,
   ],
   controllers: [AppController],
   providers: [

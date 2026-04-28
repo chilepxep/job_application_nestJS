@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateApplicationDto } from './dto/create-application.dto';
@@ -22,14 +23,20 @@ import { SortOrder } from '../permissions/dto/query-permission.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { FilesService } from '../files/files.service';
 import { FileStatus } from '../files/schemas/file.schema';
+import { AiMatchingService } from '../ai/services/ai-matching.service';
+import { CvExtractService } from '../ai/services/cv-extract.service';
 
 @Injectable()
 export class ApplicationService {
+  private readonly logger = new Logger(ApplicationService.name);
+
   constructor(
     @InjectModel(Application.name)
     private applicationModel: Model<ApplicationDocument>,
     private jobService: JobsService,
     private filesService: FilesService,
+    private aiMatchingService: AiMatchingService,
+    private cvExtractService: CvExtractService,
   ) {}
 
   //helper
@@ -44,63 +51,6 @@ export class ApplicationService {
     if (value._id) return value._id.toString();
     return value.toString();
   }
-
-  // async create(createApplicationDto: CreateApplicationDto, user: IUser) {
-  //   const { job, cvFileId, coverLetter } = createApplicationDto;
-
-  //   this.validateObjectId(job, 'Job ID');
-  //   this.validateObjectId(cvFileId, 'CV File ID');
-
-  //   const jobDoc = await this.jobService.findOne(job);
-  //   if (jobDoc.status !== JobStatus.OPEN) {
-  //     throw new BadRequestException('Job này hiện không tiếp nhận hồ sơ');
-  //   }
-
-  //   // check duplicate apply
-  //   const existed = await this.applicationModel.findOne({
-  //     job: new mongoose.Types.ObjectId(job),
-  //     candidate: user._id,
-  //   });
-  //   if (existed) {
-  //     throw new ConflictException('Bạn đã nộp hồ sơ vào job này rồi');
-  //   }
-
-  //   //validate file
-  //   const file = await this.filesService.findById(cvFileId);
-
-  //   if (file.ownerId.toString() !== user._id.toString()) {
-  //     throw new ForbiddenException('Không có quyền sử dụng CV này');
-  //   }
-
-  //   if (file.status !== FileStatus.ACTIVE) {
-  //     throw new BadRequestException('CV chưa sẵn sàng để sử dụng');
-  //   }
-
-  //   //tạo application
-  //   const application = await this.applicationModel.create({
-  //     job: new mongoose.Types.ObjectId(job),
-  //     candidate: user._id,
-
-  //     cvFileId: file._id,
-  //     cvSnapshotUrl: file.url,
-
-  //     coverLetter,
-
-  //     createdBy: {
-  //       _id: user._id,
-  //       email: user.email,
-  //     },
-  //   });
-
-  //   return {
-  //     _id: application._id,
-  //     job: application.job,
-  //     status: application.status,
-  //     createdAt: application.createdAt,
-  //   };
-  // }
-
-  //Candidate xem hồ sơ của mình
 
   async create(dto: CreateApplicationDto, user: IUser) {
     const { job, cvFileId, coverLetter } = dto;
@@ -121,7 +71,10 @@ export class ApplicationService {
     }
 
     // 🔥 check status
-    if (file.status !== FileStatus.ACTIVE) {
+    if (
+      file.status !== FileStatus.ACTIVE &&
+      file.status !== FileStatus.IN_USE
+    ) {
       throw new BadRequestException('CV không sẵn sàng để apply');
     }
 
@@ -146,6 +99,15 @@ export class ApplicationService {
         email: user.email,
       },
     });
+
+    //dọc file
+    this.cvExtractService
+      .extractAndCache(application._id.toString())
+      .catch((err) =>
+        this.logger.warn(
+          `Extract CV background thất bại cho application ${application._id}: ${err.message}`,
+        ),
+      );
 
     // 🔥 mark file IN_USE
     await this.filesService.markAsInUse(cvFileId);
@@ -415,5 +377,105 @@ export class ApplicationService {
     );
 
     return { message: 'Xoá hồ sơ thành công' };
+  }
+
+  //=======AI
+  async triggerAnalyze(
+    jobId: string,
+    user: IUser,
+  ): Promise<{ message: string; total: number }> {
+    this.validateObjectId(jobId, 'Job ID');
+
+    // Lấy job để truyền vào AI — cần title, description, requirements, skills...
+    const job = await this.jobService.findOne(jobId);
+
+    // Đếm số application thực sự cần xử lý
+    const total = await this.applicationModel.countDocuments({
+      job: jobId,
+      isDeleted: false,
+      cvExtractStatus: 'extracted',
+      matchStatus: { $in: ['not_analyzed', 'failed'] },
+    });
+
+    if (total === 0) {
+      return {
+        message: 'Không có CV nào cần phân tích',
+        total: 0,
+      };
+    }
+
+    // ✅ Thêm log để biết có gọi được không
+    this.logger.log(`Triggering analyze cho job ${jobId}, total: ${total}`);
+
+    // Chạy background — không block response
+    // HR nhận response ngay lập tức, AI xử lý ngầm phía sau
+    this.aiMatchingService
+      .analyzeJob(jobId, job)
+      .catch((err) =>
+        this.logger.error(
+          `Analyze job ${jobId} thất bại: ${err.message}`,
+          err.stack,
+        ),
+      );
+
+    return {
+      message: `Đang phân tích ${total} CV, vui lòng kiểm tra lại sau vài phút`,
+      total,
+    };
+  }
+
+  async getRanking(jobId: string) {
+    this.validateObjectId(jobId, 'Job ID');
+
+    const [done, processing, failed, pending] = await Promise.all([
+      // CV đã phân tích xong → sort theo score
+      this.applicationModel
+        .find({ job: jobId, isDeleted: false, matchStatus: 'done' })
+        .populate('candidate', 'profile.fullName email profile.avatar')
+        .select(
+          'candidate matchScore matchAnalysis status cvExtractStatus analyzedAt createdAt',
+        )
+        .sort({ matchScore: -1 })
+        .lean(),
+
+      // CV đang xử lý
+      this.applicationModel
+        .find({ job: jobId, isDeleted: false, matchStatus: 'analyzing' })
+        .populate('candidate', 'profile.fullName email')
+        .select('candidate status createdAt')
+        .lean(),
+
+      // CV phân tích thất bại
+      this.applicationModel
+        .find({ job: jobId, isDeleted: false, matchStatus: 'failed' })
+        .populate('candidate', 'profile.fullName email')
+        .select('candidate status cvExtractStatus createdAt')
+        .lean(),
+
+      // CV chưa phân tích (chưa extract hoặc chưa trigger)
+      this.applicationModel
+        .find({
+          job: jobId,
+          isDeleted: false,
+          matchStatus: 'not_analyzed',
+        })
+        .populate('candidate', 'profile.fullName email')
+        .select('candidate status cvExtractStatus createdAt')
+        .lean(),
+    ]);
+
+    return {
+      summary: {
+        total: done.length + processing.length + failed.length + pending.length,
+        done: done.length,
+        processing: processing.length,
+        failed: failed.length,
+        pending: pending.length,
+      },
+      ranking: done, // danh sách chính HR quan tâm
+      processing, // đang xử lý
+      failed, // thất bại — HR có thể trigger lại
+      pending, // chưa phân tích
+    };
   }
 }

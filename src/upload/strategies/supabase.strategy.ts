@@ -83,4 +83,15 @@ export class SupabaseStrategy implements IStorageStrategy {
       throw new InternalServerErrorException('Delete from Supabase failed');
     }
   }
+
+  async getSignedUrl(storageKey: string, expiresIn = 3600): Promise<string> {
+    const { data, error } = await this.supabase.storage
+      .from(this.bucket)
+      .createSignedUrl(storageKey, expiresIn);
+
+    if (error)
+      throw new InternalServerErrorException('Không thể tạo signed URL');
+
+    return data.signedUrl;
+  }
 }

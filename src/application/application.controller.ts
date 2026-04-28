@@ -23,6 +23,7 @@ import { CurrentUser } from '../decorator/current-user.decorator';
 import { IUser } from '../common/interfaces/user.interface';
 import { QueryApplicationDto } from './dto/query-application.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { AiMatchingService } from '../ai/services/ai-matching.service';
 
 @ApiTags('Applications')
 @ApiBearerAuth('access-token')
@@ -90,6 +91,24 @@ export class ApplicationController {
     @CurrentUser() user: IUser,
   ) {
     return this.applicationService.updateStatus(id, dto, user);
+  }
+
+  @Post('job/:jobId/analyze')
+  @ResponseMessage('Đang phân tích CV, vui lòng kiểm tra lại sau')
+  @ApiOperation({ summary: 'Trigger AI phân tích CV theo job [HR]' })
+  @ApiParam({ name: 'jobId', description: 'Job ID' })
+  @ApiPermission('Phân tích CV', 'APPLICATIONS', ['HR', 'ADMIN'])
+  triggerAnalyze(@Param('jobId') jobId: string, @CurrentUser() user: IUser) {
+    return this.applicationService.triggerAnalyze(jobId, user);
+  }
+
+  @Get('job/:jobId/ranking')
+  @ResponseMessage('Lấy bảng xếp hạng CV thành công')
+  @ApiOperation({ summary: 'Xem bảng xếp hạng CV theo % match [HR]' })
+  @ApiParam({ name: 'jobId', description: 'Job ID' })
+  @ApiPermission('Xem ranking CV', 'APPLICATIONS', ['HR', 'ADMIN'])
+  getRanking(@Param('jobId') jobId: string) {
+    return this.applicationService.getRanking(jobId);
   }
 
   @Get(':id')

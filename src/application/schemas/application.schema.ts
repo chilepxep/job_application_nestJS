@@ -56,6 +56,37 @@ export class Application {
   })
   status: ApplicationStatus;
 
+  // ── CV Text (cached để AI đọc) ────────────
+  @Prop({ default: null })
+  cvText: string; // text extract từ PDF
+
+  @Prop({
+    enum: ['pending', 'extracted', 'failed'],
+    default: 'pending',
+  })
+  cvExtractStatus: string; // trạng thái extract
+
+  // ── AI Matching ───────────────────────────
+  @Prop({ default: null })
+  matchScore: number; // 0-100
+
+  @Prop({ default: null, type: Object })
+  matchAnalysis: {
+    summary: string; // tóm tắt ngắn
+    strengths: string[]; // điểm mạnh
+    weaknesses: string[]; // điểm yếu
+    suggestion: string; // gợi ý cho HR
+  };
+
+  @Prop({
+    enum: ['not_analyzed', 'analyzing', 'done', 'failed'],
+    default: 'not_analyzed',
+  })
+  matchStatus: string;
+
+  @Prop({ default: null })
+  analyzedAt: Date;
+
   // ── Audit fields ──────────────────────────
   @Prop({ type: AuditUserSchema, default: null })
   createdBy: AuditUser;

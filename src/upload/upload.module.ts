@@ -24,6 +24,6 @@ import { SupabaseStrategy } from './strategies/supabase.strategy';
     UploadCleanupService,
     SupabaseStrategy,
   ],
-  exports: [UploadService],
+  exports: [UploadService, SupabaseStrategy],
 })
 export class UploadModule {}

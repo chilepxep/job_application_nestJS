@@ -5,13 +5,14 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Application, ApplicationSchema } from './schemas/application.schema';
 import { JobsModule } from '../jobs/jobs.module';
 import { FilesModule } from '../files/files.module';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Application.name, schema: ApplicationSchema },
     ]),
-
+    AiModule,
     JobsModule,
     FilesModule,
   ],
