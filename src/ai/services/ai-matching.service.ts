@@ -44,7 +44,7 @@ export class AiMatchingService {
     job: Job,
     retryCount = 0,
   ): Promise<void> {
-    const MAX_RETRIES = 2; // ← tăng từ 1 lên 3 vì 503 cần retry nhiều hơn
+    const MAX_RETRIES = 2;
 
     await this.applicationModel.findByIdAndUpdate(application._id, {
       matchStatus: 'analyzing',
