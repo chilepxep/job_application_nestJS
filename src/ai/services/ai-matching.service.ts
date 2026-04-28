@@ -42,9 +42,9 @@ export class AiMatchingService {
   private async analyzeOne(
     application: ApplicationDocument,
     job: Job,
-    retryCount = 0, // ← track số lần retry
+    retryCount = 0,
   ): Promise<void> {
-    const MAX_RETRIES = 1;
+    const MAX_RETRIES = 2; // ← tăng từ 1 lên 3 vì 503 cần retry nhiều hơn
 
     await this.applicationModel.findByIdAndUpdate(application._id, {
       matchStatus: 'analyzing',
@@ -53,19 +53,16 @@ export class AiMatchingService {
     try {
       const prompt = this.buildPrompt(application.cvText, job);
       const result = await this.geminiModel.generateContent(prompt);
-
       const rawText = result.response.text();
-      this.logger.debug(`Gemini raw response: ${rawText}`);
-      // 🔥 LOG RAW để debug
+
       this.logger.debug(
-        `Gemini raw response (application ${application._id}): ${rawText}`,
+        `Gemini raw (application ${application._id}): ${rawText.slice(0, 300)}`,
       );
 
       const analysis = this.parseResponse(rawText);
 
-      // 🔥 VALIDATE output
       if (!this.isValidAnalysis(analysis)) {
-        throw new Error('AI trả về sai format');
+        throw new Error(`AI trả về sai format: ${JSON.stringify(analysis)}`);
       }
 
       await this.applicationModel.findByIdAndUpdate(application._id, {
@@ -77,98 +74,106 @@ export class AiMatchingService {
     } catch (err) {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
 
-      // Kiểm tra có phải lỗi 429 không
-      const is429 =
-        message.includes('429') || message.includes('Too Many Requests');
+      // ✅ Gom tất cả lỗi retryable vào 1 chỗ
+      const retryableErrors = [
+        { pattern: '429', label: 'Rate limit' },
+        { pattern: 'Too Many Requests', label: 'Rate limit' },
+        { pattern: '503', label: 'Service unavailable' },
+        { pattern: 'Service Unavailable', label: 'Service unavailable' },
+        { pattern: 'high demand', label: 'High demand' },
+      ];
 
-      if (is429 && retryCount < MAX_RETRIES) {
-        // Parse retry delay từ message Gemini trả về, fallback 40s
-        const retryDelay = this.parseRetryDelay(message) ?? 40000;
+      const matched = retryableErrors.find((e) => message.includes(e.pattern));
+
+      if (matched && retryCount < MAX_RETRIES) {
+        // 429 → dùng delay từ header Gemini trả về
+        // 503 → exponential backoff: 10s, 20s, 40s
+        const retryDelay = message.includes('429')
+          ? (this.parseRetryDelay(message) ?? 40000)
+          : Math.min(10000 * Math.pow(2, retryCount), 60000); // max 60s
 
         this.logger.warn(
-          `Rate limit cho application ${application._id} — retry sau ${retryDelay / 1000}s (lần ${retryCount + 1}/${MAX_RETRIES})`,
+          `[${matched.label}] application ${application._id} — retry sau ${retryDelay / 1000}s (${retryCount + 1}/${MAX_RETRIES})`,
         );
 
         await this.delay(retryDelay);
-
-        // Retry
         return this.analyzeOne(application, job, retryCount + 1);
       }
 
-      // Không phải 429 hoặc đã hết retry → mark failed
       this.logger.error(
-        `Phân tích thất bại cho application ${application._id}: ${message}`,
+        `Phân tích thất bại application ${application._id}: ${message}`,
       );
-
       await this.applicationModel.findByIdAndUpdate(application._id, {
         matchStatus: 'failed',
       });
     }
   }
-
-  // Parse "Please retry in 35.05s" từ error message
-  private parseRetryDelay(message: string): number | null {
-    const match = message.match(/retry in (\d+(\.\d+)?)s/i);
-    if (!match) return null;
-
-    const seconds = parseFloat(match[1]);
-    return Math.ceil(seconds) * 1000 + 2000; // thêm 2s buffer
-  }
-
   private buildPrompt(cvText: string, job: Job): string {
+    const cleanedCv = this.preprocessCv(cvText); // ← gọi preprocessCv
+
     return `
 Bạn là chuyên gia tuyển dụng.
 
 ⚠️ BẮT BUỘC:
 - CHỈ trả về JSON hợp lệ
-- KHÔNG markdown
-- KHÔNG giải thích
-- KHÔNG text ngoài JSON
-- Key phải có dấu "
+- KHÔNG markdown, KHÔNG giải thích, KHÔNG text ngoài JSON
 - JSON phải parse được bằng JSON.parse()
 
 === JOB ===
 Title: ${job.title}
-Description: ${job.description}
 Requirements: ${job.requirements}
 Skills: ${job.skills.join(', ')}
+Experience: ${job.experience} năm
 
 === CV ===
-${cvText.slice(0, 3000)}
+${cleanedCv}
 
-=== OUTPUT ===
-{
-  "score": number,
-  "summary": string,
-  "strengths": string[],
-  "weaknesses": string[],
-  "suggestion": string
-}
-  `.trim();
+=== OUTPUT FORMAT ===
+{"score":number,"summary":"string","strengths":["string"],"weaknesses":["string"],"suggestion":"string"}
+    `.trim();
   }
 
   private parseResponse(text: string): IMatchAnalysis {
     try {
-      // 🔥 B1: extract JSON từ text
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      this.logger.debug(`Raw response length: ${text.length}`);
 
-      if (!jsonMatch) {
-        throw new Error('Không tìm thấy JSON');
+      let jsonStr = text.trim();
+
+      // B1: Bóc markdown code block nếu có
+      // ```json ... ``` hoặc ``` ... ```
+      const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1].trim();
       }
 
-      let cleaned = jsonMatch[0];
+      // B2: Tìm JSON object trong text
+      // Tìm từ { đầu tiên đến } cuối cùng
+      const start = jsonStr.indexOf('{');
+      const end = jsonStr.lastIndexOf('}');
 
-      // 🔥 B2: fix JSON lỗi phổ biến
-      cleaned = cleaned
-        .replace(/(\w+):/g, '"$1":') // key không có ""
-        .replace(/'/g, '"') // ' -> "
-        .replace(/,\s*}/g, '}') // trailing comma
-        .replace(/,\s*]/g, ']');
+      if (start === -1 || end === -1 || start >= end) {
+        throw new Error(
+          `Không tìm thấy JSON block. Text: ${jsonStr.slice(0, 100)}`,
+        );
+      }
 
-      return JSON.parse(cleaned);
+      jsonStr = jsonStr.slice(start, end + 1);
+
+      // B3: Fix trailing comma
+      jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+
+      const parsed = JSON.parse(jsonStr);
+
+      if (!this.isValidAnalysis(parsed)) {
+        throw new Error(`Invalid format: ${JSON.stringify(parsed)}`);
+      }
+
+      return parsed;
     } catch (err) {
-      this.logger.warn(`Parse Gemini thất bại. Raw: ${text}`);
-
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Parse Gemini thất bại: ${message} | Raw (200): ${text.slice(0, 200)}`,
+      );
       return {
         score: 0,
         summary: 'Không thể phân tích',
@@ -179,8 +184,21 @@ ${cvText.slice(0, 3000)}
     }
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  private preprocessCv(cvText: string): string {
+    return cvText
+      .replace(/\S+@\S+/g, '') // xóa email
+      .replace(/\+?\d[\d\s-]{8,}/g, '') // xóa phone
+      .replace(/\d{1,4}.*(Street|St|Road|Rd|City|VIC|District)/gi, '') // xóa address
+      .replace(/--\s*\d+\s*of\s*\d+\s*--/g, '') // xóa footer pdf
+      .replace(/\s{2,}/g, ' ') // chuẩn hóa whitespace
+      .trim()
+      .slice(0, 2000);
+  }
+
+  private parseRetryDelay(message: string): number | null {
+    const match = message.match(/retry in (\d+(\.\d+)?)s/i);
+    if (!match) return null;
+    return Math.ceil(parseFloat(match[1])) * 1000 + 2000;
   }
 
   private isValidAnalysis(data: any): data is IMatchAnalysis {
@@ -193,20 +211,8 @@ ${cvText.slice(0, 3000)}
       typeof data.suggestion === 'string'
     );
   }
-  private preprocessCv(cvText: string): string {
-    // 1. remove email
-    cvText = cvText.replace(/\S+@\S+/g, '');
 
-    // 2. remove phone
-    cvText = cvText.replace(/\+?\d[\d\s-]{8,}/g, '');
-
-    // 3. remove address (basic)
-    cvText = cvText.replace(
-      /\d{1,4}.*(Street|St|Road|Rd|City|VIC|District)/gi,
-      '',
-    );
-
-    // 4. limit length
-    return cvText.slice(0, 2000);
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
