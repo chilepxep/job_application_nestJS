@@ -6,8 +6,8 @@
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
-=======
-# 📋 Job Application Platform
+
+ ##📋 Job Application Platform
 > **Nền tảng quản lý đơn ứng tuyển thông minh với hỗ trợ AI**
 
 ![NestJS](https://img.shields.io/badge/NestJS-10.0-red?style=flat-square)
