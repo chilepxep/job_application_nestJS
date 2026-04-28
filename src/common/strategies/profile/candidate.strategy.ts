@@ -7,7 +7,7 @@ export class CandidateStrategy implements IProfileStrategy {
   initProfile(): Record<string, any> {
     return {
       candidateProfile: {
-        cvUrl: [],
+        cvFileIds: [],
         skills: [],
         experience: 0,
         currentPosition: '',
@@ -27,27 +27,7 @@ export class CandidateStrategy implements IProfileStrategy {
     };
   }
 
-  async buildUpdate(
-    dto: Record<string, any>,
-    currentUser: UserDocument,
-  ): Promise<Record<string, any>> {
-    // Kiểm tra giới hạn CV theo plan
-    if (dto.cvUrl) {
-      const maxCv: Record<string, number> = {
-        free: 2,
-        basic: 5,
-        premium: 10,
-      };
-      const plan = currentUser.candidateProfile?.subscription?.plan ?? 'free';
-      const limit = maxCv[plan] ?? 2;
-
-      if (dto.cvUrl.length > limit) {
-        throw new BadRequestException(
-          `Gói ${plan} chỉ được upload tối đa ${limit} CV`,
-        );
-      }
-    }
-
+  async buildUpdate(dto: Record<string, any>): Promise<Record<string, any>> {
     // Build dot notation
     const result: Record<string, any> = {};
     Object.keys(dto).forEach((key) => {

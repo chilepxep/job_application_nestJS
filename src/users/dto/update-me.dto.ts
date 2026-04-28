@@ -1,8 +1,9 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsMongoId,
   IsNumber,
   IsOptional,
   IsString,
@@ -44,14 +45,14 @@ export class UpdateProfileDto {
 //Candidate update
 export class UpdateCandidateProfileDto {
   @ApiPropertyOptional({
-    example: ['https://storage.example.com/cv1.pdf'],
+    example: ['fileId1', 'fileId2'],
     description: 'Danh sách URL CV đã upload',
     type: [String],
   })
   @IsOptional()
   @IsArray()
-  @IsUrl({}, { each: true, message: 'CV URL không hợp lệ' })
-  cvUrl?: string[];
+  @IsMongoId({ each: true, message: 'CV không hợp lệ' })
+  cvFileIds?: string[];
 
   @ApiPropertyOptional({ example: ['NestJS', 'MongoDB'] })
   @IsOptional()
@@ -116,4 +117,24 @@ export class UpdateMeDto {
   @ValidateNested()
   @Type(() => UpdateHrProfileDto)
   hrProfile?: UpdateHrProfileDto;
+}
+
+export class AddCvDto {
+  @ApiProperty({
+    example: ['507f1f77bcf86cd799439011'],
+    description: 'Danh sách file ID CV muốn thêm',
+    type: [String],
+  })
+  @IsArray()
+  @IsMongoId({ each: true, message: 'CV ID không hợp lệ' })
+  cvFileIds: string[];
+}
+
+export class ReplaceCvDto {
+  @ApiProperty({
+    example: '507f1f77bcf86cd799439011',
+    description: 'File ID CV mới',
+  })
+  @IsMongoId({ message: 'CV ID mới không hợp lệ' })
+  newFileId: string;
 }

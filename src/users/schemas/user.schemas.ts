@@ -53,8 +53,12 @@ const CandidateSubscriptionSchema = SchemaFactory.createForClass(
 @Schema({ _id: false })
 class CandidateProfile {
   //URL file CV sau khi upload lên clound
-  @Prop({ type: [String], default: [] })
-  cvUrl: string[];
+  @Prop({
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: 'File',
+    default: [],
+  })
+  cvFileIds: mongoose.Types.ObjectId[];
 
   @Prop({ type: [String], default: [] })
   skills: string[];

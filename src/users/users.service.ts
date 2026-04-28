@@ -3,19 +3,22 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { InjectModel } from '@nestjs/mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from './schemas/user.schemas';
-import mongoose, { Model } from 'mongoose';
+import mongoose, { ClientSession, Connection, Model } from 'mongoose';
 
 import bcrypt from 'bcrypt';
 
 import { QueryUserDto } from './dto/query-user.dto';
 
 import {
+  AddCvDto,
+  ReplaceCvDto,
   UpdateCandidateProfileDto,
   UpdateHrProfileDto,
   UpdateMeDto,
@@ -25,22 +28,39 @@ import { CompaniesService } from '../companies/companies.service';
 import { ProfileStrategyRegistry } from '../common/strategies/profile/profile-strategy.registry';
 import { IUser } from '../common/interfaces/user.interface';
 import { SortOrder } from '../permissions/dto/query-permission.dto';
+import { SubscriptionService } from './subscription.service';
+import { FilesService } from '../files/files.service';
+import { withTransaction } from '../common/helpers/with-transaction.helper';
+import { UploadService } from '../upload/upload.service';
+import { FileStatus } from '../files/schemas/file.schema';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   constructor(
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
-
+    private uploadService: UploadService,
     private rolesService: RolesService,
-    private companiesService: CompaniesService,
     private profileStrategyRegistry: ProfileStrategyRegistry,
+    private subscriptionService: SubscriptionService,
+    private filesService: FilesService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   //========================HELPER===============================
 
   private async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 10);
+  }
+
+  private ensureCandidate(user: UserDocument): void {
+    const roleName = this.getRoleName(user);
+    if (roleName !== 'CANDIDATE') {
+      throw new ForbiddenException(
+        'Chỉ Candidate mới thực hiện được hành động này',
+      );
+    }
   }
 
   private validateObjectId(id: string, field = 'ID') {
@@ -254,9 +274,53 @@ export class UsersService {
     this.validateObjectId(userId);
 
     const currentUser = await this.findMe(userId);
+
+    const cvFileIds = dto.candidateProfile?.cvFileIds;
+
+    const candidateProfileDto = dto.candidateProfile
+      ? { ...dto.candidateProfile }
+      : null;
+
+    if (candidateProfileDto) {
+      delete candidateProfileDto.cvFileIds;
+    }
+
+    const roleName = this.getRoleName(currentUser);
+    const strategy = this.profileStrategyRegistry.getStrategy(roleName);
+
+    if (dto.candidateProfile && roleName !== 'CANDIDATE') {
+      throw new ForbiddenException(
+        'Chỉ Candidate mới update được candidateProfile',
+      );
+    }
+
+    if (dto.hrProfile && roleName !== 'HR') {
+      throw new ForbiddenException('Chỉ HR mới update được hrProfile');
+    }
+
     let updateData: any = {};
 
-    // Update profile chung — tất cả role
+    // --- HANDLE CV UPLOAD ---
+    if (cvFileIds && cvFileIds.length > 0) {
+      const currentCvIds = currentUser.candidateProfile?.cvFileIds || [];
+      const plan = currentUser.candidateProfile?.subscription?.plan || 'free';
+      const limit = this.subscriptionService.getCvLimit(plan);
+
+      if (currentCvIds.length + cvFileIds.length > limit) {
+        throw new BadRequestException(`Bạn chỉ được upload tối đa ${limit} CV`);
+      }
+
+      for (const fileId of cvFileIds) {
+        await this.filesService.validateForUse(fileId, user._id.toString());
+      }
+
+      updateData['candidateProfile.cvFileIds'] = [
+        ...currentCvIds,
+        ...cvFileIds,
+      ];
+    }
+
+    // --- HANDLE profile chung ---
     if (dto.profile) {
       updateData = {
         ...updateData,
@@ -264,28 +328,9 @@ export class UsersService {
       };
     }
 
-    // Lấy role name để tìm strategy
-    const roleName = this.getRoleName(currentUser);
-    const strategy = this.profileStrategyRegistry.getStrategy(roleName);
-
-    // Lấy dto tương ứng với role
-    // CANDIDATE → dto.candidateProfile
-    // HR        → dto.hrProfile
-    // ADMIN     → null (không có profile riêng)
-    const roleDto = dto.candidateProfile ?? dto.hrProfile ?? null;
+    const roleDto = candidateProfileDto ?? dto.hrProfile ?? null;
 
     if (roleDto) {
-      // Kiểm tra user có gửi đúng profile cho role không
-      // VD: HR gửi candidateProfile → báo lỗi
-      if (dto.candidateProfile && roleName !== 'CANDIDATE') {
-        throw new ForbiddenException(
-          'Chỉ Candidate mới update được candidateProfile',
-        );
-      }
-      if (dto.hrProfile && roleName !== 'HR') {
-        throw new ForbiddenException('Chỉ HR mới update được hrProfile');
-      }
-
       const roleUpdate = await strategy.buildUpdate(roleDto, currentUser);
       updateData = { ...updateData, ...roleUpdate };
     }
@@ -306,6 +351,12 @@ export class UsersService {
 
     if (!updated) {
       throw new NotFoundException('Không tìm thấy user');
+    }
+
+    if (cvFileIds && cvFileIds.length > 0) {
+      for (const fileId of cvFileIds) {
+        await this.filesService.markAsActive(fileId, user._id.toString());
+      }
     }
 
     return updated;
@@ -510,6 +561,195 @@ export class UsersService {
         },
       },
     );
+  }
+
+  //thêm cv
+  async addCv(userId: string, dto: AddCvDto, user: IUser) {
+    const currentUser = await this.findMe(userId);
+    this.ensureCandidate(currentUser);
+
+    const currentCvIds = currentUser.candidateProfile?.cvFileIds || [];
+    const plan = currentUser.candidateProfile?.subscription?.plan || 'free';
+    const limit = this.subscriptionService.getCvLimit(plan);
+
+    if (currentCvIds.length + dto.cvFileIds.length > limit) {
+      throw new BadRequestException(`Bạn chỉ được upload tối đa ${limit} CV`);
+    }
+
+    // Validate tất cả file TRƯỚC khi mở transaction (chỉ đọc, không cần session)
+    for (const fileId of dto.cvFileIds) {
+      await this.filesService.validateForUse(fileId, userId);
+    }
+
+    return withTransaction(this.connection, async (session: ClientSession) => {
+      const updated = await this.userModel
+        .findByIdAndUpdate(
+          userId,
+          {
+            $push: { 'candidateProfile.cvFileIds': { $each: dto.cvFileIds } },
+            $set: { updatedBy: { _id: user._id, email: user.email } },
+          },
+          { returnDocument: 'after', session },
+        )
+        .populate({ path: 'role', select: 'name' })
+        .select('-__v -password -refreshToken');
+
+      if (!updated) throw new NotFoundException('Không tìm thấy user');
+
+      for (const fileId of dto.cvFileIds) {
+        await this.filesService.markAsActive(fileId, userId, session);
+      }
+
+      return updated;
+    });
+  }
+
+  //xoá cv
+  async removeCv(userId: string, fileId: string, user: IUser) {
+    this.validateObjectId(fileId);
+
+    const currentUser = await this.findMe(userId);
+    this.ensureCandidate(currentUser);
+
+    const fileObjectId = new mongoose.Types.ObjectId(fileId);
+
+    const exists = currentUser.candidateProfile?.cvFileIds?.some(
+      (id) => id.toString() === fileId,
+    );
+
+    if (!exists) {
+      throw new NotFoundException('CV không tồn tại trong danh sách');
+    }
+
+    // lấy file trước
+    const fileRecord = await this.filesService.findById(fileId);
+
+    if (fileRecord.status === FileStatus.IN_USE) {
+      throw new BadRequestException('CV đang được sử dụng để ứng tuyển');
+    }
+
+    const updated = await withTransaction(
+      this.connection,
+      async (session: ClientSession) => {
+        const result = await this.userModel
+          .findByIdAndUpdate(
+            userId,
+            {
+              $pull: { 'candidateProfile.cvFileIds': fileObjectId },
+              $set: {
+                updatedBy: { _id: user._id, email: user.email },
+              },
+            },
+            { returnDocument: 'after', session },
+          )
+          .populate({ path: 'role', select: 'name' })
+          .select('-__v -password -refreshToken');
+
+        if (!result) throw new NotFoundException('Không tìm thấy user');
+
+        await this.filesService.deleteRecord(fileId, session);
+
+        return result;
+      },
+    );
+
+    // 🔥 delete cloud OUTSIDE transaction
+    try {
+      await this.uploadService.deletePhysicalFile(
+        fileRecord.storageKey,
+        fileRecord.provider,
+        fileRecord.resourceType,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : JSON.stringify(err);
+
+      this.logger.warn(
+        `Xóa cloud thất bại cho file ${fileId}: ${message} — sẽ cleanup sau`,
+      );
+    }
+
+    return updated;
+  }
+
+  //thay đổi cv
+  async replaceCv(
+    userId: string,
+    oldFileId: string,
+    dto: ReplaceCvDto,
+    user: IUser,
+  ) {
+    this.validateObjectId(oldFileId);
+
+    const currentUser = await this.findMe(userId);
+    this.ensureCandidate(currentUser);
+
+    const cvIds = currentUser.candidateProfile?.cvFileIds || [];
+
+    const index = cvIds.findIndex((id) => id.toString() === oldFileId);
+
+    if (index === -1) {
+      throw new NotFoundException('CV cần thay thế không tồn tại');
+    }
+
+    // validate file mới
+    await this.filesService.validateForUse(dto.newFileId, userId);
+
+    // lấy file cũ
+    const oldFileRecord = await this.filesService.findById(oldFileId);
+
+    if (oldFileRecord.status === FileStatus.IN_USE) {
+      throw new BadRequestException('Không thể thay thế CV đang được sử dụng');
+    }
+
+    const updated = await withTransaction(
+      this.connection,
+      async (session: ClientSession) => {
+        const newCvIds = [...cvIds];
+
+        newCvIds[index] = new mongoose.Types.ObjectId(dto.newFileId);
+
+        const result = await this.userModel
+          .findByIdAndUpdate(
+            userId,
+            {
+              $set: {
+                'candidateProfile.cvFileIds': newCvIds,
+                updatedBy: { _id: user._id, email: user.email },
+              },
+            },
+            { returnDocument: 'after', session },
+          )
+          .populate({ path: 'role', select: 'name' })
+          .select('-__v -password -refreshToken');
+
+        if (!result) throw new NotFoundException('Không tìm thấy user');
+
+        // activate file mới
+        await this.filesService.markAsActive(dto.newFileId, userId, session);
+
+        // xoá record file cũ
+        await this.filesService.deleteRecord(oldFileId, session);
+
+        return result;
+      },
+    );
+
+    // 🔥 delete vật lý ngoài transaction
+    try {
+      await this.uploadService.deletePhysicalFile(
+        oldFileRecord.storageKey,
+        oldFileRecord.provider,
+        oldFileRecord.resourceType,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : JSON.stringify(err);
+
+      this.logger.warn(
+        `Xóa cloud thất bại cho file ${oldFileId}: ${message} — sẽ cleanup sau`,
+      );
+    }
+
+    return updated;
   }
 
   // PATCH /api/v1/users/:id/reset-password

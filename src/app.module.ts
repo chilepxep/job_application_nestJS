@@ -19,19 +19,39 @@ import { AuthModule } from './auth/auth.module';
 import { SeedingModule } from './seeding/seeding.module';
 import { SeedingService } from './seeding/seeding.service';
 import { JobsModule } from './jobs/jobs.module';
+import { ApplicationModule } from './application/application.module';
+import { UploadModule } from './upload/upload.module';
+import { FilesModule } from './files/files.module';
+import uploadConfig from './config/upload.config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
     //validation env
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, jwtConfig],
+      envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
+      load: [databaseConfig, jwtConfig, uploadConfig],
       validationSchema: Joi.object({
         PORT: Joi.number().default(3000),
         NODE_ENV: Joi.string()
           .valid('development', 'production', 'test')
           .default('development'),
         MONGO_URL: Joi.string().required(),
+
+        IMAGE_STORAGE: Joi.string().valid('LOCAL', 'CLOUDINARY').required(),
+        FILE_STORAGE: Joi.string().valid('LOCAL', 'SUPABASE').required(),
+
+        CLOUDINARY_CLOUD_NAME: Joi.string().when('IMAGE_STORAGE', {
+          is: 'CLOUDINARY',
+          then: Joi.required(),
+        }),
+
+        SUPABASE_URL: Joi.string().when('FILE_STORAGE', {
+          is: 'SUPABASE',
+          then: Joi.required(),
+        }),
       }),
     }),
     //connect mongoDB
@@ -60,6 +80,8 @@ import { JobsModule } from './jobs/jobs.module';
     //logger
     WinstonModule.forRoot(loggerConfig),
 
+    ScheduleModule.forRoot(),
+
     PermissionsModule,
 
     RolesModule,
@@ -73,6 +95,14 @@ import { JobsModule } from './jobs/jobs.module';
     SeedingModule,
 
     JobsModule,
+
+    ApplicationModule,
+
+    UploadModule,
+
+    FilesModule,
+
+    AiModule,
   ],
   controllers: [AppController],
   providers: [
