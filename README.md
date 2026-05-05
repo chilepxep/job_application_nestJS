@@ -224,7 +224,7 @@ npm run seed
 Sau khi chạy ứng dụng, truy cập Swagger UI:
 
 ```
-http://localhost:3000/api/docs
+http://localhost:3000/api/api-docs
 ```
 
 ### Các Endpoint Chính
